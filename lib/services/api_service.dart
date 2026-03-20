@@ -1,0 +1,248 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
+class ApiService {
+  // For Android emulator: use 10.0.2.2 to connect to host machine's localhost
+  // For iOS simulator: use localhost or 10.0.2.2
+  // For real device: use your computer's IP address (run 'ipconfig' on Windows to get your IP)
+  // For web browser testing: use localhost
+  static const String baseUrl = 'https://getva.in/api';
+
+  // User APIs
+  static Future<Map<String, dynamic>> login(String emailOrPhone, String password) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/users.php'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'action': 'login',
+        'email_or_phone': emailOrPhone,
+        'password': password,
+      }),
+    );
+    return jsonDecode(response.body);
+  }
+
+  static Future<Map<String, dynamic>> registerUser(Map<String, dynamic> userData) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/users.php'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(userData),
+    );
+    return jsonDecode(response.body);
+  }
+
+  static Future<Map<String, dynamic>> getUser(int userId) async {
+    final response = await http.get(Uri.parse('$baseUrl/users.php?id=$userId'));
+    return jsonDecode(response.body);
+  }
+
+  static Future<Map<String, dynamic>> updateWallet(int userId, double balance) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/users.php?id=$userId'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'wallet_balance': balance}),
+    );
+    return jsonDecode(response.body);
+  }
+
+  // Purchase mystery box - deduct from wallet
+  static Future<Map<String, dynamic>> purchaseMysteryBox({
+    required int userId,
+    required int boxId,
+    required double boxPrice,
+  }) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/users.php?id=$userId'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'action': 'purchase_box',
+        'box_id': boxId,
+        'box_price': boxPrice,
+      }),
+    );
+    return jsonDecode(response.body);
+  }
+
+  // Get user wallet balance
+  static Future<double> getUserWalletBalance(int userId) async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/users.php?id=$userId'));
+      final data = jsonDecode(response.body);
+      return double.tryParse(data['wallet_balance']?.toString() ?? '0') ?? 0.0;
+    } catch (e) {
+      return 0.0;
+    }
+  }
+
+  // Check if user has already purchased a specific box
+  static Future<bool> hasUserPurchasedBox(int userId, int boxId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/transactions.php?user_id=$userId&box_id=$boxId&type=purchase'),
+      );
+      final data = jsonDecode(response.body);
+      // If there's any purchase transaction for this box, return true
+      if (data is List && data.isNotEmpty) {
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateUserCredentials(int userId, {String? email, String? phone, String? password}) async {
+    final Map<String, dynamic> data = {};
+    if (email != null) data['email'] = email;
+    if (phone != null) data['phone'] = phone;
+    if (password != null && password.isNotEmpty) data['password'] = password;
+    
+    final response = await http.put(
+      Uri.parse('$baseUrl/users.php?id=$userId'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(data),
+    );
+    return jsonDecode(response.body);
+  }
+
+  // Scratch Card APIs
+  static Future<List<dynamic>> getScratchCards() async {
+    final response = await http.get(Uri.parse('$baseUrl/scratch_cards.php'));
+    return jsonDecode(response.body);
+  }
+
+  static Future<Map<String, dynamic>> getScratchCard(int cardId) async {
+    final response = await http.get(Uri.parse('$baseUrl/scratch_cards.php?id=$cardId'));
+    return jsonDecode(response.body);
+  }
+
+  // Save scratch history to database
+  static Future<Map<String, dynamic>> saveScratchHistory({
+    required int userId,
+    required int mysteryBoxId,
+    required int cardPosition,
+    required bool isGift,
+    required double rewardAmount,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/settings.php'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'action': 'save_scratch',
+        'user_id': userId,
+        'mystery_box_id': mysteryBoxId,
+        'card_position': cardPosition,
+        'is_gift': isGift,
+        'reward_amount': rewardAmount,
+      }),
+    );
+    return jsonDecode(response.body);
+  }
+
+  // Get scratch history for a user and mystery box
+  static Future<List<Map<String, dynamic>>> getScratchHistory({
+    required int userId,
+    required int mysteryBoxId,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/settings.php'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'action': 'get_scratch_history',
+        'user_id': userId,
+        'mystery_box_id': mysteryBoxId,
+      }),
+    );
+    final data = jsonDecode(response.body);
+    if (data['success'] == true) {
+      return List<Map<String, dynamic>>.from(data['history'] ?? []);
+    }
+    return [];
+  }
+
+  // Transaction APIs
+  static Future<List<dynamic>> getUserTransactions(int userId, {int limit = 50, int offset = 0}) async {
+    final response = await http.get(Uri.parse('$baseUrl/transactions.php?user_id=$userId&limit=$limit&offset=$offset'));
+    return jsonDecode(response.body);
+  }
+
+  // Get user profile data
+  static Future<Map<String, dynamic>> getUserProfile(int userId) async {
+    final response = await http.get(Uri.parse('$baseUrl/users.php?id=$userId'));
+    return jsonDecode(response.body);
+  }
+
+  // Update user profile (name, email, phone)
+  static Future<Map<String, dynamic>> updateUserProfile(int userId, {String? name, String? email, String? phone}) async {
+    final Map<String, dynamic> data = {};
+    if (name != null) data['name'] = name;
+    if (email != null) data['email'] = email;
+    if (phone != null) data['phone'] = phone;
+    
+    final response = await http.put(
+      Uri.parse('$baseUrl/users.php?id=$userId'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(data),
+    );
+    return jsonDecode(response.body);
+  }
+
+  // Update user password
+  static Future<Map<String, dynamic>> updateUserPassword(int userId, String newPassword) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/users.php?id=$userId'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'password': newPassword}),
+    );
+    return jsonDecode(response.body);
+  }
+
+  static Future<Map<String, dynamic>> createTransaction(Map<String, dynamic> transactionData) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/transactions.php'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(transactionData),
+    );
+    return jsonDecode(response.body);
+  }
+
+  // Settings APIs
+  static Future<List<int>> getRupeeOptions() async {
+    final response = await http.get(Uri.parse('$baseUrl/settings.php'));
+    final data = jsonDecode(response.body);
+    if (data['success'] == true) {
+      return List<int>.from(data['rupee_options']);
+    }
+    // Return default options if API fails
+    return [10, 50, 100, 500, 1000, 2000];
+  }
+
+  // Get scratch card limit from settings
+  static Future<int> getScratchCardLimit() async {
+    final response = await http.get(Uri.parse('$baseUrl/settings.php'));
+    final data = jsonDecode(response.body);
+    if (data['success'] == true) {
+      return int.tryParse(data['scratch_card_limit']?.toString() ?? '5') ?? 5;
+    }
+    // Return default limit if API fails
+    return 5;
+  }
+
+  // App Config APIs (banner, mystery boxes)
+  static Future<Map<String, dynamic>> getAppConfig() async {
+    final response = await http.get(Uri.parse('$baseUrl/settings.php'));
+    final data = jsonDecode(response.body);
+    if (data['success'] == true) {
+      return {
+        'banner_image': data['banner_image'] ?? 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800',
+        'mystery_boxes': data['mystery_boxes'] ?? [],
+        'scratch_card_limit': int.tryParse(data['scratch_card_limit']?.toString() ?? '5') ?? 5,
+      };
+    }
+    return {
+      'banner_image': 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800',
+      'mystery_boxes': [],
+      'scratch_card_limit': 5,
+    };
+  }
+}
