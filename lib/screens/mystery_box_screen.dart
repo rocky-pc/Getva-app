@@ -85,6 +85,21 @@ class _MysteryBoxScreenState extends State<MysteryBoxScreen>
     }
   }
 
+  Future<void> _refreshPurchaseStatus() async {
+    if (_userId == null) return;
+    try {
+      final purchased = await ApiService.hasUserPurchasedBox(_userId!, widget.box.id);
+      if (mounted && purchased && !_isPurchased) {
+        setState(() {
+          _isPurchased = true;
+        });
+        _showSuccessSnackBar('Box restored from previous purchase! 🎉');
+      }
+    } catch (e) {
+      debugPrint('Error refreshing purchase status: $e');
+    }
+  }
+
   Future<void> _loadUserBalance() async {
     if (_userId == null) return;
     try {
@@ -104,7 +119,14 @@ class _MysteryBoxScreenState extends State<MysteryBoxScreen>
         boxId: widget.box.id,
         boxPrice: widget.box.price,
       );
-      if (result['success'] == true) {
+      
+      // Debug: Print the actual response
+      debugPrint('Purchase response: $result');
+      
+      // Check for success - handle both boolean true and string 'true'
+      final isSuccess = result['success'] == true || result['success'] == 'true';
+      
+      if (isSuccess) {
         if (mounted) {
           setState(() {
             _isPurchased = true;
@@ -115,12 +137,30 @@ class _MysteryBoxScreenState extends State<MysteryBoxScreen>
           _showSuccessSnackBar('Box purchased successfully! 🎉');
         }
       } else {
+        // If purchase failed but money was deducted, we have a problem
+        // Check if there's an error in the response
+        final errorMsg = result['error'] ?? result['message'] ?? 'Purchase failed. Please try again.';
+        debugPrint('Purchase error: $errorMsg');
         if (mounted) {
-          _showErrorSnackBar(result['message'] ?? 'Purchase failed. Please try again.');
+          _showErrorSnackBar(errorMsg);
         }
       }
     } catch (e) {
-      if (mounted) _showErrorSnackBar('Something went wrong. Please try again.');
+      // If exception occurs, check if purchase might have gone through
+      // by verifying the purchase status
+      debugPrint('Purchase exception: $e');
+      if (mounted) {
+        // Try to verify purchase status
+        final wasPurchased = await ApiService.hasUserPurchasedBox(_userId!, widget.box.id);
+        if (wasPurchased) {
+          setState(() {
+            _isPurchased = true;
+          });
+          _showSuccessSnackBar('Box purchased successfully! 🎉');
+        } else {
+          _showErrorSnackBar('Something went wrong. Please try again.');
+        }
+      }
     } finally {
       if (mounted) setState(() => _isLoadingPurchase = false);
     }
@@ -385,8 +425,21 @@ void _showPurchaseDialog() {
       await _loadUserBalance();
       await _loadScratchHistory();
 
-      bool alreadyPurchased = widget.box.price <= 0 ||
-          await ApiService.hasUserPurchasedBox(userId, widget.box.id);
+      bool alreadyPurchased = false;
+      
+      // For free boxes, no purchase needed
+      if (widget.box.price <= 0) {
+        alreadyPurchased = true;
+      } else {
+        try {
+          alreadyPurchased = await ApiService.hasUserPurchasedBox(userId, widget.box.id);
+          debugPrint('hasUserPurchasedBox result for box ${widget.box.id}: $alreadyPurchased');
+        } catch (e) {
+          debugPrint('Error checking purchase status: $e');
+          // On error, assume not purchased to be safe
+          alreadyPurchased = false;
+        }
+      }
 
       if (!mounted) return;
 

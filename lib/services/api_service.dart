@@ -51,16 +51,32 @@ class ApiService {
     required int boxId,
     required double boxPrice,
   }) async {
-    final response = await http.put(
-      Uri.parse('$baseUrl/users.php?id=$userId'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'action': 'purchase_box',
-        'box_id': boxId,
-        'box_price': boxPrice,
-      }),
-    );
-    return jsonDecode(response.body);
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/users.php?id=$userId'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'action': 'purchase_box',
+          'box_id': boxId,
+          'box_price': boxPrice,
+        }),
+      );
+      
+      // Debug: print response status and body
+      print('purchaseMysteryBox response status: ${response.statusCode}');
+      print('purchaseMysteryBox response body: ${response.body}');
+      
+      // Try to parse the response
+      final decoded = jsonDecode(response.body);
+      return decoded;
+    } catch (e) {
+      // If parsing fails, return a map that will trigger error handling
+      print('purchaseMysteryBox exception: $e');
+      return {
+        'success': false,
+        'error': 'Failed to parse response: $e'
+      };
+    }
   }
 
   // Get user wallet balance
@@ -80,13 +96,29 @@ class ApiService {
       final response = await http.get(
         Uri.parse('$baseUrl/transactions.php?user_id=$userId&box_id=$boxId&type=purchase'),
       );
+      
+      // Debug: print response status and body
+      print('hasUserPurchasedBox response status: ${response.statusCode}');
+      print('hasUserPurchasedBox response body: ${response.body}');
+      
+      // Check if response is successful
+      if (response.statusCode != 200) {
+        print('hasUserPurchasedBox: Non-200 status code');
+        return false;
+      }
+      
       final data = jsonDecode(response.body);
+      
       // If there's any purchase transaction for this box, return true
       if (data is List && data.isNotEmpty) {
+        print('hasUserPurchasedBox: Found ${data.length} purchase(s)');
         return true;
       }
+      
+      print('hasUserPurchasedBox: No purchases found');
       return false;
     } catch (e) {
+      print('hasUserPurchasedBox exception: $e');
       return false;
     }
   }
