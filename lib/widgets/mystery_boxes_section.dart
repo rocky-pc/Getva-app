@@ -20,16 +20,6 @@ class MysteryBoxesSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Mystery Boxes',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Colors.white, // Pop against black BG
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 16),
           // Changed to GridView with 2 columns
           GridView.builder(
             shrinkWrap: true,

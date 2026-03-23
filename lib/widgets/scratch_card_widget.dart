@@ -19,7 +19,7 @@ class SimpleScratchCard extends StatefulWidget {
     required this.revealedContent,
     this.scratchContent,
     this.onRevealed,
-    this.scratchThreshold = 0.40, // Increased for better feel
+    this.scratchThreshold = 0.45,
     this.brushSize = 45.0,
     this.enableTapToReveal = true,
     this.baseColor = const Color(0xFF1A73E8), // Google Blue
@@ -29,30 +29,83 @@ class SimpleScratchCard extends StatefulWidget {
   State<SimpleScratchCard> createState() => _SimpleScratchCardState();
 }
 
-class _SimpleScratchCardState extends State<SimpleScratchCard> {
+class _SimpleScratchCardState extends State<SimpleScratchCard> with TickerProviderStateMixin {
   bool _isRevealed = false;
+  bool _revealAnimationStarted = false;
   final List<Offset> _scratchPoints = [];
   final GlobalKey _cardKey = GlobalKey();
 
+  late AnimationController _revealController;
+  late Animation<double> _opacityAnimation;
+  late Animation<double> _revealScaleAnimation;
+
+  late AnimationController _zoomController;
+  late Animation<double> _interactionScaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _revealController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+
+    _opacityAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _revealController,
+        curve: const Interval(0.0, 0.8, curve: Curves.easeOut),
+      ),
+    );
+
+    _revealScaleAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+      CurvedAnimation(
+        parent: _revealController,
+        curve: Curves.easeOutBack,
+      ),
+    );
+
+    _zoomController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _interactionScaleAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
+      CurvedAnimation(parent: _zoomController, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _revealController.dispose();
+    _zoomController.dispose();
+    super.dispose();
+  }
+
   void _onPanStart(DragStartDetails details) {
-    if (_isRevealed) return;
+    if (_revealAnimationStarted) return;
+    _zoomController.forward();
     _addPoint(details.localPosition);
     HapticFeedback.lightImpact();
   }
 
   void _onPanUpdate(DragUpdateDetails details) {
-    if (_isRevealed) return;
+    if (_revealAnimationStarted) return;
     _addPoint(details.localPosition);
     if (_scratchPoints.length % 5 == 0) {
       HapticFeedback.selectionClick();
     }
   }
 
+  void _onPanEnd(DragEndDetails details) {
+    if (!_revealAnimationStarted) {
+      _zoomController.reverse();
+    }
+  }
+
   void _onTap(TapUpDetails details) {
-    if (_isRevealed || !widget.enableTapToReveal) return;
+    if (_revealAnimationStarted || !widget.enableTapToReveal) return;
     final tapPos = details.localPosition;
     final brushSize = widget.brushSize;
-    
+
     for (double angle = 0; angle < 2 * pi; angle += 0.8) {
       final offset = Offset(
         tapPos.dx + brushSize * 0.4 * cos(angle),
@@ -74,13 +127,13 @@ class _SimpleScratchCardState extends State<SimpleScratchCard> {
   }
 
   void _checkThreshold(Size size) {
-    if (size.width == 0 || size.height == 0) return;
-    
-    const gridSize = 10;
+    if (size.width == 0 || size.height == 0 || _revealAnimationStarted) return;
+
+    const gridSize = 8;
     final cw = size.width / gridSize;
     final ch = size.height / gridSize;
     int scratched = 0;
-    final halfBrush = widget.brushSize / 2;
+    final halfBrush = widget.brushSize / 1.8;
 
     for (int x = 0; x < gridSize; x++) {
       for (int y = 0; y < gridSize; y++) {
@@ -95,57 +148,104 @@ class _SimpleScratchCardState extends State<SimpleScratchCard> {
     }
 
     final pct = scratched / (gridSize * gridSize);
-    if (pct >= widget.scratchThreshold && !_isRevealed) {
-      setState(() => _isRevealed = true);
-      widget.onRevealed?.call();
-      HapticFeedback.heavyImpact();
+    if (pct >= widget.scratchThreshold) {
+      _startReveal();
     }
+  }
+
+  void _startReveal() {
+    if (_revealAnimationStarted) return;
+    setState(() => _revealAnimationStarted = true);
+
+    _zoomController.reverse();
+    HapticFeedback.heavyImpact();
+    _revealController.forward().then((_) {
+      if (mounted) {
+        setState(() => _isRevealed = true);
+        widget.onRevealed?.call();
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: GestureDetector(
-          onPanStart: _onPanStart,
-          onPanUpdate: _onPanUpdate,
-          onTapUp: _onTap,
-          child: Stack(
-            key: _cardKey,
-            fit: StackFit.expand,
-            children: [
-              // Revealed content (e.g., Reward Amount)
-              Container(
-                color: Colors.white,
-                child: widget.revealedContent,
-              ),
-              
-              if (!_isRevealed) ...[
-                if (widget.scratchContent != null) widget.scratchContent!,
-                CustomPaint(
-                  size: Size.infinite,
-                  painter: _GPayScratchPainter(
-                    scratchPoints: _scratchPoints,
-                    brushSize: widget.brushSize,
-                    baseColor: widget.baseColor,
-                  ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return AnimatedBuilder(
+          animation: _interactionScaleAnimation,
+          builder: (context, child) {
+            return Transform.scale(
+              scale: _interactionScaleAnimation.value,
+              child: child,
+            );
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.12),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
               ],
-            ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: GestureDetector(
+                onPanStart: _onPanStart,
+                onPanUpdate: _onPanUpdate,
+                onPanEnd: _onPanEnd,
+                onTapUp: _onTap,
+                child: SizedBox(
+                  key: _cardKey,
+                  width: constraints.maxWidth,
+                  height: constraints.maxHeight,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Revealed content (e.g., Reward Amount)
+                      Container(
+                        color: Colors.white,
+                        child: widget.revealedContent,
+                      ),
+
+                      if (!_isRevealed)
+                        AnimatedBuilder(
+                          animation: _revealController,
+                          builder: (context, child) {
+                            return Opacity(
+                              opacity: _opacityAnimation.value,
+                              child: Transform.scale(
+                                scale: _revealAnimationStarted ? _revealScaleAnimation.value : 1.0,
+                                alignment: Alignment.center,
+                                child: child,
+                              ),
+                            );
+                          },
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              if (widget.scratchContent != null) widget.scratchContent!,
+                              CustomPaint(
+                                size: Size(constraints.maxWidth, constraints.maxHeight),
+                                painter: _GPayScratchPainter(
+                                  scratchPoints: _scratchPoints,
+                                  brushSize: widget.brushSize,
+                                  baseColor: widget.baseColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -172,49 +272,36 @@ class _GPayScratchPainter extends CustomPainter {
         end: Alignment.bottomRight,
         colors: [
           baseColor,
-          baseColor.withBlue(min(255, baseColor.blue + 40)).withGreen(min(255, baseColor.green + 20)),
+          baseColor.withBlue(min(255, baseColor.blue + 30)).withGreen(min(255, baseColor.green + 15)),
         ],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-    
+
     canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), paint);
 
     // 2. Geometric Pattern (Circles)
     final patternPaint = Paint()
-      ..color = Colors.white.withOpacity(0.12)
+      ..color = Colors.white.withOpacity(0.1)
       ..style = PaintingStyle.fill;
-    
-    const double spacing = 30.0;
+
+    const double spacing = 32.0;
     for (double x = 0; x < size.width + spacing; x += spacing) {
       for (double y = 0; y < size.height + spacing; y += spacing) {
         bool offsetRow = (y / spacing).floor() % 2 == 0;
         double currentX = offsetRow ? x : x - (spacing / 2);
-        canvas.drawCircle(Offset(currentX, y), 3, patternPaint);
+        canvas.drawCircle(Offset(currentX, y), 2.5, patternPaint);
       }
     }
 
-    // 3. Subtle Inner Border
-    final borderPaint = Paint()
-      ..color = Colors.white.withOpacity(0.2)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(8, 8, size.width - 16, size.height - 16),
-        const Radius.circular(10),
-      ),
-      borderPaint,
-    );
-
-    // 4. Scratch Instruction
+    // 3. Scratch Instruction
     if (scratchPoints.isEmpty) {
       final textPainter = TextPainter(
         text: TextSpan(
-          text: 'SCRATCH HERE',
+          text: 'SCRATCH CARD',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.white.withOpacity(0.7),
             fontSize: 12,
             fontWeight: FontWeight.w900,
-            letterSpacing: 2.0,
+            letterSpacing: 1.5,
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -225,7 +312,7 @@ class _GPayScratchPainter extends CustomPainter {
       );
     }
 
-    // 5. Erase Scratched Areas
+    // 4. Erase Scratched Areas
     if (scratchPoints.isNotEmpty) {
       final erasePaint = Paint()
         ..blendMode = BlendMode.clear
@@ -245,10 +332,9 @@ class _GPayScratchPainter extends CustomPainter {
         path.lineTo(scratchPoints.last.dx, scratchPoints.last.dy);
         canvas.drawPath(path, erasePaint);
       }
-      
-      final circleErase = Paint()..blendMode = BlendMode.clear;
+
       for (final pt in scratchPoints) {
-        canvas.drawCircle(pt, brushSize / 2, circleErase);
+        canvas.drawCircle(pt, brushSize / 2, erasePaint);
       }
     }
 

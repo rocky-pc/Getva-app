@@ -1,12 +1,38 @@
 import 'dart:convert';
+import 'package:Getva/services/session_manager.dart';
 import 'package:http/http.dart' as http;
+import '../models/gold_rate.dart';
 
 class ApiService {
   // For Android emulator: use 10.0.2.2 to connect to host machine's localhost
   // For iOS simulator: use localhost or 10.0.2.2
   // For real device: use your computer's IP address (run 'ipconfig' on Windows to get your IP)
   // For web browser testing: use localhost
-  static const String baseUrl = 'https://getva.in/api';
+  static String baseUrl = 'https://getva.in/api';
+
+  static void setBaseUrl(String url) => baseUrl = url;
+  static void resetBaseUrl() => baseUrl = 'https://getva.in/api';
+
+  static Future<Map<String, dynamic>> updateGoldRates(List<GoldRate> rates) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/gold_rates.php'),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: {
+          'action': 'update_rates',
+          'rates': jsonEncode(rates
+              .map((rate) => {
+                    'gold_type': rate.goldType,
+                    'rate_per_gram': rate.ratePerGram,
+                  })
+              .toList()),
+        },
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to sync gold rates: $e'};
+    }
+  }
 
   // User APIs
   static Future<Map<String, dynamic>> login(String emailOrPhone, String password) async {
@@ -61,11 +87,11 @@ class ApiService {
           'box_price': boxPrice,
         }),
       );
-      
+
       // Debug: print response status and body
       print('purchaseMysteryBox response status: ${response.statusCode}');
       print('purchaseMysteryBox response body: ${response.body}');
-      
+
       // Try to parse the response
       final decoded = jsonDecode(response.body);
       return decoded;
@@ -96,25 +122,25 @@ class ApiService {
       final response = await http.get(
         Uri.parse('$baseUrl/transactions.php?user_id=$userId&box_id=$boxId&type=purchase'),
       );
-      
+
       // Debug: print response status and body
       print('hasUserPurchasedBox response status: ${response.statusCode}');
       print('hasUserPurchasedBox response body: ${response.body}');
-      
+
       // Check if response is successful
       if (response.statusCode != 200) {
         print('hasUserPurchasedBox: Non-200 status code');
         return false;
       }
-      
+
       final data = jsonDecode(response.body);
-      
+
       // If there's any purchase transaction for this box, return true
       if (data is List && data.isNotEmpty) {
         print('hasUserPurchasedBox: Found ${data.length} purchase(s)');
         return true;
       }
-      
+
       print('hasUserPurchasedBox: No purchases found');
       return false;
     } catch (e) {
@@ -128,7 +154,7 @@ class ApiService {
     if (email != null) data['email'] = email;
     if (phone != null) data['phone'] = phone;
     if (password != null && password.isNotEmpty) data['password'] = password;
-    
+
     final response = await http.put(
       Uri.parse('$baseUrl/users.php?id=$userId'),
       headers: {'Content-Type': 'application/json'},
@@ -210,7 +236,7 @@ class ApiService {
     if (name != null) data['name'] = name;
     if (email != null) data['email'] = email;
     if (phone != null) data['phone'] = phone;
-    
+
     final response = await http.put(
       Uri.parse('$baseUrl/users.php?id=$userId'),
       headers: {'Content-Type': 'application/json'},
@@ -277,4 +303,139 @@ class ApiService {
       'scratch_card_limit': 5,
     };
   }
+
+  // Gold APIs
+  static Future<List<GoldRate>> getGoldRates() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/gold_rates.php?action=rates'),
+      );
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) {
+        return (data['data'] as List)
+            .map((json) => GoldRate.fromJson(json))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('getGoldRates error: $e');
+      return [];
+    }
+  }
+
+  static Future<List<GoldRateHistory>> getGoldRateHistory({
+    String goldType = '24K',
+    String period = '3months',
+  }) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/gold_rates.php?action=history&gold_type=$goldType&period=$period'),
+      );
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) {
+        return (data['data'] as List)
+            .map((json) => GoldRateHistory.fromJson(json))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('getGoldRateHistory error: $e');
+      return [];
+    }
+  }
+
+  static Future<Map<String, dynamic>> purchaseGold({
+    required int userId,
+    required String goldType,
+    required double grams,
+    required double amount,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/gold_rates.php'),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: {
+          'action': 'purchase',
+          'user_id': userId,
+          'gold_type': goldType,
+          'grams': grams,
+          'amount': amount,
+        },
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      print('purchaseGold error: $e');
+      return {'success': false, 'message': 'Failed to purchase gold: $e'};
+    }
+  }
+
+  static Future<List<GoldWallet>> getUserGoldWallet(int userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/gold_rates.php?action=user_wallet&user_id=$userId'),
+      );
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) {
+        return (data['data'] as List)
+            .map((json) => GoldWallet.fromJson(json))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('getUserGoldWallet error: $e');
+      return [];
+    }
+  }
+
+  static Future<List<GoldPurchase>> getUserGoldPurchases(int userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/gold_rates.php?action=purchase_history&user_id=$userId'),
+      );
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) {
+        return (data['data'] as List)
+            .map((json) => GoldPurchase.fromJson(json))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('getUserGoldPurchases error: $e');
+      return [];
+    }
+  }
+
+  static Future<double> getWalletBalance() async {
+    final userId = await SessionManager.getUserId();
+    if (userId == null) throw Exception('User not logged in');
+    final response = await http.get(Uri.parse('$baseUrl/wallet_balance.php?user_id=$userId'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['balance'] ?? 0.0;
+    }
+    throw Exception('Failed to load wallet balance');
+  }
+
+  static Future<double> getGoldWalletBalance() async {
+    final userId = await SessionManager.getUserId();
+    if (userId == null) throw Exception('User not logged in');
+    final response = await http.get(Uri.parse('$baseUrl/gold_wallet_balance.php?user_id=$userId'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['gold_balance'] ?? 0.0;
+    }
+    throw Exception('Failed to load gold wallet balance');
+  }
+
+  static Future<List<Map<String, dynamic>>> getRecentTransactions() async {
+    final userId = await SessionManager.getUserId();
+    if (userId == null) throw Exception('User not logged in');
+    final response = await http.get(Uri.parse('$baseUrl/recent_transactions.php?user_id=$userId'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return List<Map<String, dynamic>>.from(data['transactions'] ?? []);
+    }
+    throw Exception('Failed to load transactions');
+  }
 }
+

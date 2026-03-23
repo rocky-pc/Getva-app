@@ -130,6 +130,8 @@ class _MysteryBoxScreenState extends State<MysteryBoxScreen>
         if (mounted) {
           setState(() {
             _isPurchased = true;
+            _limitReached = false; // Reset limit reached status to allow more scratching
+            _scratchCardLimit += 5; // Add 5 more scratch chances per purchase
             _userBalance = double.tryParse(
                     result['new_balance']?.toString() ?? '0') ??
                 0.0;
@@ -155,6 +157,8 @@ class _MysteryBoxScreenState extends State<MysteryBoxScreen>
         if (wasPurchased) {
           setState(() {
             _isPurchased = true;
+            _limitReached = false; // Reset limit reached status to allow more scratching
+            _scratchCardLimit += 5; // Add 5 more scratch chances per purchase
           });
           _showSuccessSnackBar('Box purchased successfully! 🎉');
         } else {
@@ -475,6 +479,12 @@ void _showPurchaseDialog() {
             _cardControllers[pos]?.forward();
           }
         });
+        
+        // Check if limit was already reached after loading history
+        if (_revealedCards.length >= _scratchCardLimit) {
+          setState(() => _limitReached = true);
+          if (mounted) _showLimitReachedDialog();
+        }
       }
     } catch (e) {
       debugPrint('Error loading scratch history: $e');
@@ -488,6 +498,69 @@ void _showPurchaseDialog() {
     } catch (e) {
       debugPrint('Error loading scratch limit: $e');
     }
+  }
+
+  // Gradient colors for cards
+  static const List<List<Color>> _cardGradients = [
+    [Color(0xFF1A73E8), Color(0xFF0D47A1)],
+    [Color(0xFF00BFA5), Color(0xFF00695C)],
+    [Color(0xFF7C4DFF), Color(0xFF4A148C)],
+    [Color(0xFFFF6D00), Color(0xFFBF360C)],
+    [Color(0xFF00B0FF), Color(0xFF0277BD)],
+  ];
+
+  void _openScratchView(int position) {
+    if (!_isPurchased || _limitReached) {
+      if (!_isPurchased) {
+        _showPurchaseDialog();
+      } else if (_limitReached) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.lock_rounded, color: Colors.white, size: 18),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Scratch limit reached! Purchase a new box to continue.',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+      return;
+    }
+
+    if (_revealedCards.contains(position)) return;
+
+    final isGift = widget.box.giftPositions.contains(position);
+    final reward = widget.box.giftRewards[position] ?? _giftRewards[position] ?? 0.0;
+    final gradientIndex = (position - 1) % _cardGradients.length;
+    final gradient = _cardGradients[gradientIndex];
+
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black.withOpacity(0.85),
+        transitionDuration: const Duration(milliseconds: 400),
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return _ScratchView(
+            position: position,
+            isGift: isGift,
+            reward: reward,
+            gradient: gradient,
+            onRevealed: () => _onCardRevealed(position),
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _onCardRevealed(int position) async {
@@ -555,7 +628,7 @@ void _showPurchaseDialog() {
   void _showLimitReachedDialog() {
     showGeneralDialog(
       context: context,
-      barrierDismissible: true,
+      barrierDismissible: false,
       barrierLabel: '',
       barrierColor: Colors.black.withOpacity(0.8),
       transitionDuration: const Duration(milliseconds: 400),
@@ -647,7 +720,7 @@ void _showPurchaseDialog() {
                             child: TextButton(
                               onPressed: () {
                                 Navigator.pop(ctx);
-                                Navigator.pop(context);
+                                Navigator.of(context).popUntil((route) => route.isFirst);
                               },
                               style: TextButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -822,6 +895,7 @@ void _showPurchaseDialog() {
                               reward: widget.box.giftRewards[pos] ?? _giftRewards[pos],
                               onRevealed: () => _onCardRevealed(pos),
                               isLocked: !_isPurchased || _limitReached,
+                              onTap: () => _openScratchView(pos),
                             ),
                           );
                         },
@@ -1216,6 +1290,7 @@ class _MysteryCard extends StatelessWidget {
   final double? reward;
   final VoidCallback onRevealed;
   final bool isLocked;
+  final VoidCallback? onTap;
 
   static const List<List<Color>> _cardGradients = [
     [Color(0xFF1A73E8), Color(0xFF0D47A1)],
@@ -1232,21 +1307,28 @@ class _MysteryCard extends StatelessWidget {
     required this.reward,
     required this.onRevealed,
     this.isLocked = false,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     if (isRevealed) {
-      return _CardBack(isGift: isGift, reward: reward);
+      return GestureDetector(
+        onTap: onTap,
+        child: _CardBack(isGift: isGift, reward: reward),
+      );
     }
 
     final gradientIndex = (position - 1) % _cardGradients.length;
     final gradient = _cardGradients[gradientIndex];
 
-    return SimpleScratchCard(
-      baseColor: gradient[0],
-      revealedContent: _CardBack(isGift: isGift, reward: reward),
-      onRevealed: onRevealed,
+    // Show card cover with tap to open scratch view
+    return GestureDetector(
+      onTap: onTap,
+      child: Hero(
+        tag: 'scratch_card_$position',
+        child: _CardCover(gradient: gradient, position: position),
+      ),
     );
   }
 }
@@ -1340,6 +1422,242 @@ class _CardBack extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+// ─── Card Cover (Scratch Card Front) ───
+class _CardCover extends StatelessWidget {
+  final List<Color> gradient;
+  final int position;
+
+  const _CardCover({required this.gradient, required this.position});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: gradient,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: gradient[0].withOpacity(0.4),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Stack(
+          children: [
+            // Decorative sparkles
+            Positioned(
+              right: -8,
+              top: -8,
+              child: Icon(
+                Icons.auto_awesome,
+                color: Colors.white.withOpacity(0.15),
+                size: 36,
+              ),
+            ),
+            Positioned(
+              left: -4,
+              bottom: -4,
+              child: Icon(
+                Icons.stars_rounded,
+                color: Colors.white.withOpacity(0.1),
+                size: 28,
+              ),
+            ),
+            // Center icon
+            Center(
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.redeem_rounded,
+                  color: Colors.white70,
+                  size: 24,
+                ),
+              ),
+            ),
+            // Card number badge
+            Positioned(
+              left: 8,
+              bottom: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '#$position',
+                  style: const TextStyle(
+                    color: Colors.white60,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Scratch View (Popup Scratch Card) ───
+class _ScratchView extends StatelessWidget {
+  final int position;
+  final bool isGift;
+  final double reward;
+  final List<Color> gradient;
+  final VoidCallback onRevealed;
+
+  const _ScratchView({
+    required this.position,
+    required this.isGift,
+    required this.reward,
+    required this.gradient,
+    required this.onRevealed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              const Color(0xFF1A1A2E).withOpacity(0.95),
+              const Color(0xFF0D0D14).withOpacity(0.98),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const SizedBox(width: 40),
+                    const Text(
+                      'Scratch to Win',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          color: Colors.white54,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              // Scratch Card
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: AspectRatio(
+                  aspectRatio: 1,
+                  child: Hero(
+                    tag: 'scratch_card_$position',
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: gradient[0].withOpacity(0.3),
+                            blurRadius: 30,
+                            spreadRadius: 5,
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: SimpleScratchCard(
+                          baseColor: gradient[0],
+                          revealedContent: _CardBack(isGift: isGift, reward: reward),
+                          onRevealed: onRevealed,
+                          scratchThreshold: 0.4,
+                          brushSize: 50.0,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const Spacer(),
+              // Instructions
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white.withOpacity(0.1)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.touch_app_rounded,
+                            color: Colors.white.withOpacity(0.5),
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Scratch the card to reveal your reward',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.5),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
