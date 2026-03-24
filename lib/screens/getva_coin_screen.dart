@@ -141,55 +141,66 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
     });
 
     try {
-      // Load settings
+      // Load settings - with default fallback
       GetvaCoinSettings? settings;
       try {
         final settingsResponse = await ApiService.getGetvaCoinSettings();
+        print('GetvaCoinSettings response: $settingsResponse');
         if (settingsResponse != null && settingsResponse['success'] == true) {
-          settings =
-              GetvaCoinSettings.fromJson(settingsResponse['data'] ?? {});
+          settings = GetvaCoinSettings.fromJson(settingsResponse['data'] ?? {});
+          print('Parsed settings isEnabled: ${settings.isEnabled}');
         }
-      } catch (_) {}
+      } catch (e) {
+        print('Error loading settings: $e');
+      }
 
-      // Load packages
+      // Load packages - with default fallback
       List<GetvaCoinPackage> packages = [];
       try {
         final packagesResponse = await ApiService.getGetvaCoinPackages();
+        print('GetvaCoinPackages response: $packagesResponse');
         if (packagesResponse != null && packagesResponse['success'] == true) {
           final list = packagesResponse['data'] as List<dynamic>? ?? [];
           packages = list.map((p) => GetvaCoinPackage.fromJson(p)).toList();
+          print('Loaded ${packages.length} packages');
         }
-      } catch (_) {}
+      } catch (e) {
+        print('Error loading packages: $e');
+      }
 
       // Load wallet
       GetvaCoinWallet? wallet;
       try {
         final userId = await SessionManager.getUserId();
         if (userId != null) {
-          final walletResponse =
-          await ApiService.getGetvaCoinWallet(userId);
+          final walletResponse = await ApiService.getGetvaCoinWallet(userId);
+          print('GetvaCoinWallet response: $walletResponse');
           if (walletResponse != null &&
               walletResponse['success'] == true &&
               walletResponse['data'] != null) {
             wallet = GetvaCoinWallet.fromJson(walletResponse['data']);
           }
         }
-      } catch (_) {}
+      } catch (e) {
+        print('Error loading wallet: $e');
+      }
 
       // Load transactions
       List<GetvaCoinTransaction> transactions = [];
       try {
         final userId = await SessionManager.getUserId();
         if (userId != null) {
-          final txnResponse =
-          await ApiService.getGetvaCoinTransactions(userId);
+          final txnResponse = await ApiService.getGetvaCoinTransactions(userId);
+          print('GetvaCoinTransactions response: $txnResponse');
           if (txnResponse != null && txnResponse['success'] == true) {
             final txnList = txnResponse['data'] as List<dynamic>? ?? [];
             transactions =
                 txnList.map((t) => GetvaCoinTransaction.fromJson(t)).toList();
           }
         }
-      } catch (_) {}
+      } catch (e) {
+        print('Error loading transactions: $e');
+      }
 
       if (mounted) {
         setState(() {
@@ -201,6 +212,7 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
         });
       }
     } catch (e) {
+      print('Error in _loadData: $e');
       if (mounted) {
         setState(() {
           _error = 'Failed to load data. Please try again.';
