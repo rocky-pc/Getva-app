@@ -93,7 +93,6 @@ class _WalletBalanceCardState extends State<WalletBalanceCard>
     }
   }
 
-  // ─────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -119,19 +118,21 @@ class _WalletBalanceCardState extends State<WalletBalanceCard>
             borderRadius: BorderRadius.circular(28),
             child: Stack(
               children: [
-                // ── Base gradient ──
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color.lerp(const Color(0xFF1C1735),
-                            const Color(0xFF221A45), _pulseAnim.value)!,
-                        const Color(0xFF13102A),
-                        const Color(0xFF0E0C1C),
-                      ],
-                      stops: const [0, 0.5, 1],
+                // ── Base gradient (Wrapped in Positioned.fill to avoid infinite size) ──
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color.lerp(const Color(0xFF1C1735),
+                              const Color(0xFF221A45), _pulseAnim.value)!,
+                          const Color(0xFF13102A),
+                          const Color(0xFF0E0C1C),
+                        ],
+                        stops: const [0, 0.5, 1],
+                      ),
                     ),
                   ),
                 ),
@@ -185,22 +186,26 @@ class _WalletBalanceCardState extends State<WalletBalanceCard>
                   ),
                 ),
 
-                // ── Grid ──
-                CustomPaint(
-                    painter: _CardGridPainter(), child: const SizedBox.expand()),
+                // ── Grid (Wrapped in Positioned.fill to fix size.isFinite error) ──
+                Positioned.fill(
+                  child: CustomPaint(
+                      painter: _CardGridPainter(), child: const SizedBox.expand()),
+                ),
 
-                // ── Border ──
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(
-                      color: Color.lerp(
-                          _border, _gold.withOpacity(0.35), _pulseAnim.value)!,
+                // ── Border (Wrapped in Positioned.fill) ──
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(
+                        color: Color.lerp(
+                            _border, _gold.withOpacity(0.35), _pulseAnim.value)!,
+                      ),
                     ),
                   ),
                 ),
 
-                // ── Content ──
+                // ── Content (Determines the Stack's size) ──
                 Padding(
                   padding: const EdgeInsets.fromLTRB(22, 22, 22, 0),
                   child: Column(
@@ -239,7 +244,8 @@ class _WalletBalanceCardState extends State<WalletBalanceCard>
     );
   }
 
-  // ── Top row ──
+  // ... rest of the widget methods remain the same ...
+
   Widget _buildTopRow() {
     return Row(
       children: [
@@ -294,7 +300,6 @@ class _WalletBalanceCardState extends State<WalletBalanceCard>
     );
   }
 
-  // ── Balance ──
   Widget _buildBalanceRow() {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -353,8 +358,6 @@ class _WalletBalanceCardState extends State<WalletBalanceCard>
             fontSize: 12, fontWeight: FontWeight.w500, letterSpacing: 0.5));
   }
 
-  // ── Action strip ─────────────────────────────────────────────
-  // Each button is Expanded → equal width, no overflow, no wrapping.
   Widget _buildActionStrip() {
     return IntrinsicHeight(
       child: Row(
@@ -392,9 +395,9 @@ class _WalletBalanceCardState extends State<WalletBalanceCard>
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  ACTION BUTTON  –  icon above label, full Expanded width
-// ═══════════════════════════════════════════════════════════════
+// Keeping the rest of the private helper classes (_ActionButton, _StripDivider, etc.)
+// from the original file...
+
 class _ActionButton extends StatefulWidget {
   final IconData icon;
   final String   label;
@@ -453,7 +456,6 @@ class _ActionButtonState extends State<_ActionButton>
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Icon circle
               Container(
                 width: 42, height: 42,
                 decoration: BoxDecoration(
@@ -471,7 +473,6 @@ class _ActionButtonState extends State<_ActionButton>
                 child: Icon(widget.icon, color: widget.color, size: 20),
               ),
               const SizedBox(height: 8),
-              // Label — single line, ellipsis if somehow too tight
               Text(
                 widget.label,
                 maxLines: 1,
@@ -492,7 +493,6 @@ class _ActionButtonState extends State<_ActionButton>
   }
 }
 
-// ── Thin vertical divider between strip buttons ──────────────────
 class _StripDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -514,9 +514,6 @@ class _StripDivider extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  SKELETON PULSE
-// ═══════════════════════════════════════════════════════════════
 class _SkeletonPulse extends StatefulWidget {
   final double width;
   final double height;
@@ -568,9 +565,6 @@ class _SkeletonPulseState extends State<_SkeletonPulse>
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  CARD GRID PAINTER
-// ═══════════════════════════════════════════════════════════════
 class _CardGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {

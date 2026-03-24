@@ -171,124 +171,132 @@ class _WalletScreenState extends State<WalletScreen>
     return Scaffold(
       backgroundColor: _surface,
       extendBody: true,
-      body: Stack(
-        children: [
-          // ── Background gradient ──
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFF080714),
-                  Color(0xFF0A0910),
-                  Color(0xFF060512)
-                ],
-                stops: [0, 0.5, 1],
+      body: SizedBox.expand(
+        child: Stack(
+          children: [
+            // ── Background gradient ──
+            Positioned.fill(
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0xFF080714),
+                      Color(0xFF0A0910),
+                      Color(0xFF060512)
+                    ],
+                    stops: [0, 0.5, 1],
+                  ),
+                ),
               ),
             ),
-          ),
 
-          // ── Orbs — FIX: merge both orbAnim and pulseAnim so both drive rebuilds ──
-          AnimatedBuilder(
-            animation: Listenable.merge([_orbAnim, _pulseAnim]),
-            builder: (_, __) => Stack(
-              children: [
-                Positioned(
-                  top: -80 + _orbAnim.value * 35,
-                  left: size.width / 2 - 190 + _orbAnim.value * 25,
-                  child: _OrbGlow(
-                    color: _gold
-                        .withOpacity(0.15 + _pulseAnim.value * 0.05),
-                    size: 400,
+            // ── Orbs ──
+            Positioned.fill(
+              child: AnimatedBuilder(
+                animation: Listenable.merge([_orbAnim, _pulseAnim]),
+                builder: (_, __) => Stack(
+                  children: [
+                    Positioned(
+                      top: -80 + _orbAnim.value * 35,
+                      left: size.width / 2 - 190 + _orbAnim.value * 25,
+                      child: _OrbGlow(
+                        color: _gold
+                            .withOpacity(0.15 + _pulseAnim.value * 0.05),
+                        size: 400,
+                      ),
+                    ),
+                    Positioned(
+                      top: 220 + _orbAnim.value * -28,
+                      right: -100 + _orbAnim.value * 18,
+                      child: _OrbGlow(
+                        color: _violet
+                            .withOpacity(0.10 + _pulseAnim.value * 0.03),
+                        size: 300,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // ── Static bottom-left orb ──
+            const Positioned(
+              bottom: 100,
+              left: -60,
+              child: _OrbGlow(color: Color(0x0D22C55E), size: 240),
+            ),
+
+            // ── Particles ──
+            Positioned.fill(
+              child: AnimatedBuilder(
+                animation: _particleCtrl,
+                builder: (_, __) => CustomPaint(
+                  painter: _ParticlePainter(
+                      particles: _particles,
+                      progress: _particleCtrl.value),
+                ),
+              ),
+            ),
+
+            // ── Noise ──
+            Positioned.fill(
+              child: Opacity(
+                opacity: 0.022,
+                child: CustomPaint(painter: _NoisePainter(seed: 33)),
+              ),
+            ),
+
+            // ── Scroll content ──
+            CustomScrollView(
+              physics: const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics()),
+              slivers: [
+                SliverToBoxAdapter(child: _buildAppBar()),
+                const SliverToBoxAdapter(child: SizedBox(height: 6)),
+                SliverToBoxAdapter(
+                  child: _AnimatedReveal(
+                    animation: _entryAnim,
+                    delay: 0.05,
+                    child: _buildQuickActions(),
                   ),
                 ),
-                Positioned(
-                  top: 220 + _orbAnim.value * -28,
-                  right: -100 + _orbAnim.value * 18,
-                  child: _OrbGlow(
-                    color: _violet
-                        .withOpacity(0.10 + _pulseAnim.value * 0.03),
-                    size: 300,
+                const SliverToBoxAdapter(child: SizedBox(height: 22)),
+                SliverToBoxAdapter(
+                  child: _AnimatedReveal(
+                    animation: _entryAnim,
+                    delay: 0.12,
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20),
+                      child: WalletBalanceCard(),
+                    ),
                   ),
                 ),
+                const SliverToBoxAdapter(child: SizedBox(height: 28)),
+                SliverToBoxAdapter(
+                  child: _AnimatedReveal(
+                    animation: _entryAnim,
+                    delay: 0.20,
+                    child: const _SectionLabel(title: 'Recent Transactions'),
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 14)),
+                SliverToBoxAdapter(
+                  child: _AnimatedReveal(
+                    animation: _entryAnim,
+                    delay: 0.26,
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20),
+                      child: RecentTransactions(),
+                    ),
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 140)),
               ],
             ),
-          ),
-
-          // ── Static bottom-left orb ──
-          const Positioned(
-            bottom: 100,
-            left: -60,
-            child: _OrbGlow(color: Color(0x0D22C55E), size: 240),
-          ),
-
-          // ── Particles ──
-          AnimatedBuilder(
-            animation: _particleCtrl,
-            builder: (_, __) => CustomPaint(
-              size: size,
-              painter: _ParticlePainter(
-                  particles: _particles,
-                  progress: _particleCtrl.value),
-            ),
-          ),
-
-          // ── Noise ──
-          Opacity(
-            opacity: 0.022,
-            child: CustomPaint(
-                size: size, painter: _NoisePainter(seed: 33)),
-          ),
-
-          // ── Scroll content ──
-          CustomScrollView(
-            physics: const BouncingScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics()),
-            slivers: [
-              SliverToBoxAdapter(child: _buildAppBar()),
-              const SliverToBoxAdapter(child: SizedBox(height: 6)),
-              SliverToBoxAdapter(
-                child: _AnimatedReveal(
-                  animation: _entryAnim,
-                  delay: 0.05,
-                  child: _buildQuickActions(),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 22)),
-              SliverToBoxAdapter(
-                child: _AnimatedReveal(
-                  animation: _entryAnim,
-                  delay: 0.12,
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20),
-                    child: WalletBalanceCard(),
-                  ),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 28)),
-              SliverToBoxAdapter(
-                child: _AnimatedReveal(
-                  animation: _entryAnim,
-                  delay: 0.20,
-                  child: const _SectionLabel(title: 'Recent Transactions'),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 14)),
-              SliverToBoxAdapter(
-                child: _AnimatedReveal(
-                  animation: _entryAnim,
-                  delay: 0.26,
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20),
-                    child: RecentTransactions(),
-                  ),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 140)),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
 
       // ── FAB ──

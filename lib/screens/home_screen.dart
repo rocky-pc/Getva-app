@@ -158,24 +158,6 @@ class _HomeScreenState extends State<HomeScreen>
     if (index == _selectedIndex) return;
     HapticFeedback.selectionClick();
     setState(() => _selectedIndex = index);
-    
-    if (index == 0) {
-      // Gold tab - navigate to gold screen
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => GoldScreen()),
-      );
-    } else if (index == 1) {
-      // Share market - show placeholder
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Share market feature coming soon!')),
-      );
-    } else if (index == 2) {
-      // Getva Coin - show placeholder
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Getva Coin feature coming soon!')),
-      );
-    }
   }
 
   void _onBoxTap(MysteryBox box) {
@@ -221,211 +203,220 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildHomeContent(Size size) {
-    return Stack(
-      children: [
-        // ── Deep background gradient ──
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFF080714), Color(0xFF0A0910), Color(0xFF060512)],
-              stops: [0, 0.5, 1],
-            ),
-          ),
-        ),
-
-        // ── Animated orb 1 ──
-        AnimatedBuilder(
-          animation: _orbAnimSafe,
-          builder: (_, __) => Positioned(
-            top: -80 + _orbAnimSafe.value * 40,
-            left: size.width / 2 - 200 + _orbAnimSafe.value * 30,
-            child: _OrbGlow(
-              color: _gold.withOpacity(0.18 + _pulseAnim.value * 0.06),
-              size: 420,
-            ),
-          ),
-        ),
-
-        // ── Animated orb 2 ──
-        AnimatedBuilder(
-          animation: _orbAnimSafe,
-          builder: (_, __) => Positioned(
-            top: 180 + _orbAnimSafe.value * -30,
-            right: -110 + _orbAnimSafe.value * 20,
-            child: _OrbGlow(
-              color: _violet.withOpacity(0.12 + _pulseAnim.value * 0.04),
-              size: 320,
-            ),
-          ),
-        ),
-
-        // ── Orb 3 bottom ──
-        AnimatedBuilder(
-          animation: _orbAnimSafe,
-          builder: (_, __) => Positioned(
-            bottom: 140,
-            left: -70 + _orbAnimSafe.value * 25,
-            child: _OrbGlow(
-              color: _violetLight.withOpacity(0.08),
-              size: 260,
-            ),
-          ),
-        ),
-
-        // ── Floating particles ──
-        AnimatedBuilder(
-          animation: _particleCtrl,
-          builder: (_, __) => CustomPaint(
-            size: size,
-            painter: _ParticlePainter(
-              particles: _particles,
-              progress: _particleCtrl.value,
-            ),
-          ),
-        ),
-
-        // ── Noise/grain overlay ──
-        Opacity(
-          opacity: 0.025,
-          child: CustomPaint(
-            size: size,
-            painter: _NoisePainter(),
-          ),
-        ),
-
-        // ── Main scroll ──
-        CustomScrollView(
-          physics: const BouncingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics()),
-          slivers: [
-            // AppBar
-            SliverToBoxAdapter(
-              child: SafeArea(
-                bottom: false,
-                child: _buildAppBar(),
-              ),
-            ),
-
-            const SliverToBoxAdapter(child: SizedBox(height: 22)),
-
-            // Live Stats Row
-            SliverToBoxAdapter(
-              child: _buildStatsRow(),
-            ),
-
-            const SliverToBoxAdapter(child: SizedBox(height: 20)),
-
-            // Greeting
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _AnimatedReveal(
-                  animation: _entryAnim,
-                  delay: 0.0,
-                  child: _GreetingBanner(pulseAnim: _pulseAnim),
+    return SizedBox.expand(
+      child: Stack(
+        children: [
+          // ── Deep background gradient ──
+          Positioned.fill(
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFF080714), Color(0xFF0A0910), Color(0xFF060512)],
+                  stops: [0, 0.5, 1],
                 ),
               ),
             ),
+          ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 20)),
+          // ── Animated orb 1 ──
+          AnimatedBuilder(
+            animation: _orbAnimSafe,
+            builder: (_, __) => Positioned(
+              top: -80 + _orbAnimSafe.value * 40,
+              left: size.width / 2 - 200 + _orbAnimSafe.value * 30,
+              child: _OrbGlow(
+                color: _gold.withOpacity(0.18 + _pulseAnim.value * 0.06),
+                size: 420,
+              ),
+            ),
+          ),
 
-            // Investment Options
-            SliverToBoxAdapter(
-              child: _AnimatedReveal(
-                animation: _entryAnim,
-                delay: 0.15,
-                child: _InvestmentOptionsSection(
-                  onGoldTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => GoldScreen()),
-                  ),
-                  onShareMarketTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Share market feature coming soon!')),
-                    );
-                  },
-                  onGetvaCoinTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Getva Coin feature coming soon!')),
-                    );
-                  },
+          // ── Animated orb 2 ──
+          AnimatedBuilder(
+            animation: _orbAnimSafe,
+            builder: (_, __) => Positioned(
+              top: 180 + _orbAnimSafe.value * -30,
+              right: -110 + _orbAnimSafe.value * 20,
+              child: _OrbGlow(
+                color: _violet.withOpacity(0.12 + _pulseAnim.value * 0.04),
+                size: 320,
+              ),
+            ),
+          ),
+
+          // ── Orb 3 bottom ──
+          AnimatedBuilder(
+            animation: _orbAnimSafe,
+            builder: (_, __) => Positioned(
+              bottom: 140,
+              left: -70 + _orbAnimSafe.value * 25,
+              child: _OrbGlow(
+                color: _violetLight.withOpacity(0.08),
+                size: 260,
+              ),
+            ),
+          ),
+
+          // ── Floating particles ──
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _particleCtrl,
+              builder: (_, __) => CustomPaint(
+                painter: _ParticlePainter(
+                  particles: _particles,
+                  progress: _particleCtrl.value,
                 ),
               ),
             ),
+          ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 28)),
+          // ── Noise/grain overlay ──
+          Positioned.fill(
+            child: Opacity(
+              opacity: 0.025,
+              child: CustomPaint(
+                painter: _NoisePainter(),
+              ),
+            ),
+          ),
 
-            // Banner
-            if (!_isLoading && _bannerImage.isNotEmpty)
+          // ── Main scroll ──
+          CustomScrollView(
+            physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics()),
+            slivers: [
+              // AppBar
+              SliverToBoxAdapter(
+                child: SafeArea(
+                  bottom: false,
+                  child: _buildAppBar(),
+                ),
+              ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 22)),
+
+              // Live Stats Row
+              SliverToBoxAdapter(
+                child: _buildStatsRow(),
+              ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 20)),
+
+              // Greeting
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: _AnimatedReveal(
                     animation: _entryAnim,
-                    delay: 0.1,
-                    child: _StyledBanner(imageUrl: _bannerImage),
+                    delay: 0.0,
+                    child: _GreetingBanner(pulseAnim: _pulseAnim),
                   ),
                 ),
               ),
 
-            if (!_isLoading && _bannerImage.isNotEmpty)
+              const SliverToBoxAdapter(child: SizedBox(height: 20)),
+
+              // Investment Options
+              SliverToBoxAdapter(
+                child: _AnimatedReveal(
+                  animation: _entryAnim,
+                  delay: 0.15,
+                  child: _InvestmentOptionsSection(
+                    onGoldTap: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const GoldScreen()),
+                      );
+                    },
+                    onShareMarketTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Share market feature coming soon!')),
+                      );
+                    },
+                    onGetvaCoinTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Getva Coin feature coming soon!')),
+                      );
+                    },
+                  ),
+                ),
+              ),
+
               const SliverToBoxAdapter(child: SizedBox(height: 28)),
 
-            // Section label
-            if (!_isLoading && _mysteryBoxes.isNotEmpty)
-              SliverToBoxAdapter(
-                child: _AnimatedReveal(
-                  animation: _entryAnim,
-                  delay: 0.2,
-                  child: _SectionLabel(shimmer: _shimmerAnim),
-                ),
-              ),
-
-            if (!_isLoading && _mysteryBoxes.isNotEmpty)
-              const SliverToBoxAdapter(child: SizedBox(height:0)),
-
-            // Mystery boxes
-            if (!_isLoading && _mysteryBoxes.isNotEmpty)
-              SliverToBoxAdapter(
-                child: _AnimatedReveal(
-                  animation: _entryAnim,
-                  delay: 0.3,
-                  child: MysteryBoxesSection(
-                    boxes: _mysteryBoxes,
-                    onBoxTap: _onBoxTap,
+              // Banner
+              if (!_isLoading && _bannerImage.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: _AnimatedReveal(
+                      animation: _entryAnim,
+                      delay: 0.1,
+                      child: _StyledBanner(imageUrl: _bannerImage),
+                    ),
                   ),
                 ),
-              ),
 
-            // Empty state
-            if (!_isLoading && _mysteryBoxes.isEmpty)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-                  child: _EmptyState(),
+              if (!_isLoading && _bannerImage.isNotEmpty)
+                const SliverToBoxAdapter(child: SizedBox(height: 28)),
+
+              // Section label
+              if (!_isLoading && _mysteryBoxes.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: _AnimatedReveal(
+                    animation: _entryAnim,
+                    delay: 0.2,
+                    child: _SectionLabel(shimmer: _shimmerAnim),
+                  ),
                 ),
-              ),
 
-            // Loading skeleton
-            if (_isLoading)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _LoadingSkeleton(shimmer: _shimmerAnim),
+              if (!_isLoading && _mysteryBoxes.isNotEmpty)
+                const SliverToBoxAdapter(child: SizedBox(height:0)),
+
+              // Mystery boxes
+              if (!_isLoading && _mysteryBoxes.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: _AnimatedReveal(
+                    animation: _entryAnim,
+                    delay: 0.3,
+                    child: MysteryBoxesSection(
+                      boxes: _mysteryBoxes,
+                      onBoxTap: _onBoxTap,
+                    ),
+                  ),
                 ),
-              ),
 
-            // Recent wins marquee
-            if (!_isLoading)
+              // Empty state
+              if (!_isLoading && _mysteryBoxes.isEmpty)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+                    child: _EmptyState(),
+                  ),
+                ),
+
+              // Loading skeleton
+              if (_isLoading)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: _LoadingSkeleton(shimmer: _shimmerAnim),
+                  ),
+                ),
+
+              // Recent wins marquee
+              if (!_isLoading)
 
 
-            const SliverToBoxAdapter(child: SizedBox(height: 130)),
-          ],
-        ),
-      ],
+                const SliverToBoxAdapter(child: SizedBox(height: 130)),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
