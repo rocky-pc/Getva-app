@@ -411,7 +411,13 @@ class ApiService {
     final response = await http.get(Uri.parse('$baseUrl/wallet_balance.php?user_id=$userId'));
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-      return data['balance'] ?? 0.0;
+      // Check if the response was successful before returning the balance
+      if (data['success'] == true) {
+        return (data['balance'] ?? 0.0).toDouble();
+      } else {
+        // If not successful, try to get balance from users.php as fallback
+        return getUserWalletBalance(userId);
+      }
     }
     throw Exception('Failed to load wallet balance');
   }
