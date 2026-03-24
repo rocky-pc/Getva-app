@@ -452,7 +452,7 @@ class ApiService {
   static Future<Map<String, dynamic>> getGetvaCoinSettings() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/settings.php?action=getva_coin_settings'),
+        Uri.parse('$baseUrl/getva_coin.php?action=getva_coin_settings'),
       );
       return jsonDecode(response.body);
     } catch (e) {
@@ -464,7 +464,7 @@ class ApiService {
   static Future<Map<String, dynamic>> getGetvaCoinPackages() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/settings.php?action=getva_coin_packages'),
+        Uri.parse('$baseUrl/getva_coin.php?action=getva_coin_packages'),
       );
       return jsonDecode(response.body);
     } catch (e) {
@@ -476,7 +476,7 @@ class ApiService {
   static Future<Map<String, dynamic>> getGetvaCoinWallet(int userId) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/settings.php?action=getva_coin_wallet&user_id=$userId'),
+        Uri.parse('$baseUrl/getva_coin.php?action=getva_coin_wallet&user_id=$userId'),
       );
       return jsonDecode(response.body);
     } catch (e) {
@@ -488,7 +488,7 @@ class ApiService {
   static Future<Map<String, dynamic>> getGetvaCoinTransactions(int userId) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/settings.php?action=getva_coin_transactions&user_id=$userId'),
+        Uri.parse('$baseUrl/getva_coin.php?action=getva_coin_transactions&user_id=$userId'),
       );
       return jsonDecode(response.body);
     } catch (e) {
@@ -505,7 +505,7 @@ class ApiService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/settings.php'),
+        Uri.parse('$baseUrl/getva_coin.php'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'action': 'purchase_getva_coins',

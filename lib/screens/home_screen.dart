@@ -12,6 +12,7 @@ import 'wallet_screen.dart';
 import 'profile_screen.dart';
 import 'gold_screen.dart';
 import 'getva_coin_screen.dart';
+import 'share_market_screen.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  DESIGN TOKENS
@@ -440,56 +441,6 @@ class _HomeScreenState extends State<HomeScreen>
             child: _WalletChip(key: _walletChipKey),
           ),
           const SizedBox(width: 8),
-          GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const GetvaCoinScreen()),
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [_cardBg, _cardBg2],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: _gold.withOpacity(0.3)),
-                boxShadow: [
-                  BoxShadow(
-                    color: _gold.withOpacity(0.1),
-                    blurRadius: 14,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 22,
-                    height: 22,
-                    decoration: BoxDecoration(
-                      color: _gold.withOpacity(0.12),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Text('🪙', style: TextStyle(fontSize: 12)),
-                  ),
-                  const SizedBox(width: 7),
-                  const Text(
-                    'Getva Coin',
-                    style: TextStyle(
-                      color: _gold,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
           const SizedBox(width: 10),
           // Notification
           _AnimatedReveal(
@@ -1720,7 +1671,12 @@ class _InvestmentOptionsSection extends StatelessWidget {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  onTap: onShareMarketTap,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const ShareMarketScreen()),
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: 12),
@@ -1734,7 +1690,12 @@ class _InvestmentOptionsSection extends StatelessWidget {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  onTap: onGetvaCoinTap,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const GetvaCoinScreen()),
+                    );
+                  },
                 ),
               ),
             ],
