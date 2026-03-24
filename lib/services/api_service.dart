@@ -437,5 +437,82 @@ class ApiService {
     }
     throw Exception('Failed to load transactions');
   }
+
+  // ======================
+  // GETVA COIN APIs
+  // ======================
+
+  // Get Getva Coin settings
+  static Future<Map<String, dynamic>> getGetvaCoinSettings() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/settings.php?action=getva_coin_settings'),
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to get settings: $e'};
+    }
+  }
+
+  // Get Getva Coin packages
+  static Future<Map<String, dynamic>> getGetvaCoinPackages() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/settings.php?action=getva_coin_packages'),
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to get packages: $e'};
+    }
+  }
+
+  // Get Getva Coin wallet balance
+  static Future<Map<String, dynamic>> getGetvaCoinWallet(int userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/settings.php?action=getva_coin_wallet&user_id=$userId'),
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to get wallet: $e'};
+    }
+  }
+
+  // Get Getva Coin transactions
+  static Future<Map<String, dynamic>> getGetvaCoinTransactions(int userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/settings.php?action=getva_coin_transactions&user_id=$userId'),
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to get transactions: $e'};
+    }
+  }
+
+  // Purchase Getva Coins
+  static Future<Map<String, dynamic>> purchaseGetvaCoins({
+    required int userId,
+    required int packageId,
+    required int coinAmount,
+    required double price,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/settings.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'action': 'purchase_getva_coins',
+          'user_id': userId,
+          'package_id': packageId,
+          'coin_amount': coinAmount,
+          'price': price,
+        }),
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to purchase coins: $e'};
+    }
+  }
 }
 
