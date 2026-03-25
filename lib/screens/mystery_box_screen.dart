@@ -22,6 +22,8 @@ class _MysteryBoxScreenState extends State<MysteryBoxScreen>
   int? _userId;
   double _userBalance = 0.0;
   bool _isPurchased = false;
+  int _scratchLimit = 5; // Total scratch limit available
+  int _usedScratches = 0; // Number of scratches used
 
   final Map<int, double> _giftRewards = {
     1: 10.0,
@@ -36,6 +38,9 @@ class _MysteryBoxScreenState extends State<MysteryBoxScreen>
   void initState() {
     super.initState();
     _loadUserId();
+
+    // Initialize scratch limit from box settings
+    _scratchLimit = widget.box.scratchLimit;
 
     _headerPulseCtrl = AnimationController(
       vsync: this,
@@ -70,49 +75,106 @@ class _MysteryBoxScreenState extends State<MysteryBoxScreen>
   Future<void> _loadScratchHistory() async {
     if (_userId == null) return;
     try {
+      // First, try to get scratch limit from API settings
+      final apiScratchLimit = await ApiService.getScratchCardLimit();
+      
       final history = await ApiService.getScratchHistory(userId: _userId!, mysteryBoxId: widget.box.id);
       if (mounted) {
         setState(() {
+          // Use API scratch limit if available, otherwise use box setting
+          _scratchLimit = apiScratchLimit > 0 ? apiScratchLimit : widget.box.scratchLimit;
+          _usedScratches = history.length; // Track how many scratches have been used
           for (var item in history) {
             _revealedCards.add(item['card_position'] as int);
           }
         });
       }
-    } catch (e) {}
+    } catch (e) {
+      // On error, use box setting
+      if (mounted) {
+        setState(() {
+          _scratchLimit = widget.box.scratchLimit;
+          _usedScratches = _revealedCards.length;
+        });
+      }
+    }
   }
 
   void _showPurchaseDialog() {
     showDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF141220),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text('Unlock Mystery Box', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(16)),
-              child: Column(
-                children: [
-                  Text(widget.box.name, style: const TextStyle(color: Color(0xFFD4A847), fontSize: 18, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 12),
-                  Text('₹${widget.box.price.toStringAsFixed(0)}', style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900)),
-                ],
+      barrierDismissible: false, // Strict: User cannot dismiss by tapping outside
+      builder: (context) => WillPopScope(
+        onWillPop: () async => false, // Prevent back button
+        child: AlertDialog(
+          backgroundColor: const Color(0xFF141220),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Row(
+            children: [
+              Icon(Icons.redeem_rounded, color: Color(0xFFD4A847), size: 28),
+              SizedBox(width: 12),
+              Text('Unlock Mystery Box', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(16)),
+                child: Column(
+                  children: [
+                    Text(widget.box.name, style: const TextStyle(color: Color(0xFFD4A847), fontSize: 18, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 12),
+                    Text('₹${widget.box.price.toStringAsFixed(0)}', style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00BFA5).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF00BFA5).withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.grid_4x4_rounded, color: Color(0xFF00BFA5), size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${widget.box.scratchLimit} Scratch Attempts',
+                      style: const TextStyle(color: Color(0xFF00BFA5), fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Later', style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              onPressed: _userBalance >= widget.box.price
+                  ? () {
+                      Navigator.pop(context);
+                      _purchaseBox();
+                    }
+                  : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD4A847),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: Text(
+                _userBalance >= widget.box.price ? 'Purchase' : 'Insufficient Balance',
+                style: const TextStyle(color: Color(0xFF1A1200), fontWeight: FontWeight.bold),
               ),
             ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Later', style: TextStyle(color: Colors.white54))),
-          ElevatedButton(
-            onPressed: _userBalance >= widget.box.price ? () { Navigator.pop(context); _purchaseBox(); } : null,
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4A847), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            child: const Text('Purchase', style: TextStyle(color: Color(0xFF1A1200), fontWeight: FontWeight.bold)),
-          ),
-        ],
       ),
     );
   }
@@ -122,13 +184,34 @@ class _MysteryBoxScreenState extends State<MysteryBoxScreen>
     try {
       final result = await ApiService.purchaseMysteryBox(userId: _userId!, boxId: widget.box.id, boxPrice: widget.box.price);
       if (result['success'] == true) {
-        if (mounted) setState(() { _isPurchased = true; _loadUserBalance(); });
+        if (mounted) {
+          setState(() {
+            _isPurchased = true;
+            // Extend scratch limit by box's scratch limit (e.g., +5 scratches)
+            _scratchLimit = _scratchLimit + widget.box.scratchLimit;
+          });
+          _loadUserBalance();
+          
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Purchased successfully! +${widget.box.scratchLimit} scratches added'),
+              backgroundColor: const Color(0xFF00BFA5),
+            ),
+          );
+        }
       }
     } catch (e) {}
   }
 
   void _onCardTapped(int position) {
     if (_revealedCards.contains(position)) return;
+
+    // Check if scratch limit is reached
+    if (_usedScratches >= _scratchLimit) {
+      _showLimitReachedDialog();
+      return;
+    }
 
     final isGift = widget.box.giftPositions.contains(position);
     final reward = isGift ? (_giftRewards[position] ?? 0.0) : 0.0;
@@ -151,6 +234,107 @@ class _MysteryBoxScreenState extends State<MysteryBoxScreen>
     );
   }
 
+  // Show strict popup when scratch limit is reached
+  void _showLimitReachedDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Strict: User cannot dismiss by tapping outside
+      builder: (context) => WillPopScope(
+        onWillPop: () async => false, // Prevent back button
+        child: AlertDialog(
+          backgroundColor: const Color(0xFF141220),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Row(
+            children: [
+              Icon(Icons.lock_outline_rounded, color: Color(0xFFD4A847), size: 28),
+              SizedBox(width: 12),
+              Text('Scratch Limit Reached', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    const Text(
+                      'You have used all your scratch attempts!',
+                      style: TextStyle(color: Colors.white70, fontSize: 14),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'Remaining: ',
+                          style: TextStyle(color: Colors.white54, fontSize: 14),
+                        ),
+                        Text(
+                          '$_usedScratches / $_scratchLimit',
+                          style: const TextStyle(color: Color(0xFFD4A847), fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A73E8).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF1A73E8).withOpacity(0.3)),
+                ),
+                child: Column(
+                  children: [
+                    const Text(
+                      'Buy again to get more scratches!',
+                      style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '₹${widget.box.price.toStringAsFixed(0)} + $_scratchLimit scratches',
+                      style: const TextStyle(color: Color(0xFFD4A847), fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context), // Still cannot dismiss easily
+              child: const Text('Later', style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              onPressed: _userBalance >= widget.box.price
+                  ? () {
+                      Navigator.pop(context);
+                      _purchaseBox();
+                    }
+                  : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD4A847),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: Text(
+                _userBalance >= widget.box.price ? 'Buy Now' : 'Insufficient Balance',
+                style: const TextStyle(color: Color(0xFF1A1200), fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Color _getCardColor(int position) {
     if (position % 3 == 0) return const Color(0xFF1A73E8);
     if (position % 2 == 0) return const Color(0xFF00BFA5);
@@ -160,7 +344,10 @@ class _MysteryBoxScreenState extends State<MysteryBoxScreen>
   Future<void> _onCardRevealed(int position, bool isGift, double reward) async {
     if (_revealedCards.contains(position)) return;
     
-    setState(() => _revealedCards.add(position));
+    setState(() {
+      _revealedCards.add(position);
+      _usedScratches++; // Increment used scratches
+    });
     
     await ApiService.saveScratchHistory(
       userId: _userId!,
@@ -274,16 +461,33 @@ class _MysteryBoxScreenState extends State<MysteryBoxScreen>
   }
 
   Widget _buildStatsRow() {
+    final remainingScratches = _scratchLimit - _usedScratches;
+    final isLimitReached = remainingScratches <= 0;
+    
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: const Color(0xFF1A1A24), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white.withOpacity(0.05))),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A24), 
+        borderRadius: BorderRadius.circular(20), 
+        border: Border.all(color: isLimitReached ? Colors.red.withOpacity(0.5) : Colors.white.withOpacity(0.05))
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _StatChip(label: 'SCRATCHED', value: '${_revealedCards.length}/15', icon: Icons.grid_4x4_rounded),
+          _StatChip(
+            label: 'SCRATCHES', 
+            value: '$remainingScratches / $_scratchLimit', 
+            icon: Icons.grid_4x4_rounded,
+            highlight: isLimitReached,
+          ),
           Container(width: 1, height: 30, color: Colors.white10),
-          _StatChip(label: 'WINS', value: '${_revealedCards.where((p) => widget.box.giftPositions.contains(p)).length}', icon: Icons.stars_rounded, highlight: true),
+          _StatChip(
+            label: 'WINS', 
+            value: '${_revealedCards.where((p) => widget.box.giftPositions.contains(p)).length}', 
+            icon: Icons.stars_rounded, 
+            highlight: true
+          ),
         ],
       ),
     );

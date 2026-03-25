@@ -8,11 +8,12 @@ import '../services/api_service.dart';
 import '../services/session_manager.dart';
 
 // ═══════════════════════════════════════════════════════════════
-//  DESIGN TOKENS
+//  DESIGN TOKENS - Enhanced Color Palette
 // ═══════════════════════════════════════════════════════════════
 const _gold        = Color(0xFFD4A847);
 const _goldBright  = Color(0xFFFFE066);
 const _goldDeep    = Color(0xFFB8892A);
+const _goldGlow    = Color(0xFFFFD966);
 const _surface     = Color(0xFF0A0910);
 const _cardBg      = Color(0xFF110F1E);
 const _cardBg2     = Color(0xFF16132A);
@@ -28,7 +29,7 @@ const _textMuted   = Color(0xFF6B6880);
 const _border      = Color(0xFF1E1B32);
 
 // ═══════════════════════════════════════════════════════════════
-//  GETVA COIN SCREEN
+//  GETVA COIN SCREEN - Enhanced Version
 // ═══════════════════════════════════════════════════════════════
 class GetvaCoinScreen extends StatefulWidget {
   const GetvaCoinScreen({super.key});
@@ -52,6 +53,12 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
   // ── UI State ─────────────────────────────────────────────────
   String _selectedPeriod = '24H';
   bool _animationsReady = false;
+  int _selectedChartIndex = -1;
+
+  // ── Chart Data ───────────────────────────────────────────────
+  late List<FlSpot> _priceSpots;
+  late List<FlSpot> _volumeSpots;
+  List<double> _chartData = [];
 
   // ── Animation Controllers ────────────────────────────────────
   late AnimationController _pulseCtrl;
@@ -59,20 +66,41 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
   late AnimationController _particleCtrl;
   late AnimationController _entryCtrl;
   late AnimationController _shimmerCtrl;
+  late AnimationController _chartAnimationCtrl;
+  late AnimationController _glowCtrl;
 
   late Animation<double> _pulseAnim;
   late Animation<double> _orbAnim;
   late Animation<double> _entryAnim;
   late Animation<double> _shimmerAnim;
+  late Animation<double> _chartAnim;
+  late Animation<double> _glowAnim;
 
   final List<_Particle> _particles = [];
 
-  // ── Lifecycle ────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
+    _initChartData();
     _initAnimations();
     _loadData();
+  }
+
+  void _initChartData() {
+    // Generate realistic crypto-style chart data
+    final random = math.Random(42);
+    double price = 38.5;
+    List<double> data = [];
+    for (int i = 0; i < 30; i++) {
+      // Add realistic price movement with volatility
+      double change = (random.nextDouble() - 0.5) * 2.5;
+      price = (price + change).clamp(35.0, 48.0);
+      data.add(price);
+    }
+    _chartData = data;
+
+    _priceSpots = List.generate(data.length, (i) => FlSpot(i.toDouble(), data[i]));
+    _volumeSpots = List.generate(data.length, (i) => FlSpot(i.toDouble(), random.nextDouble() * 15 + 5));
   }
 
   void _initAnimations() {
@@ -85,14 +113,12 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
     _pulseCtrl = AnimationController(
         vsync: this, duration: const Duration(seconds: 3))
       ..repeat(reverse: true);
-    _pulseAnim =
-        CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut);
+    _pulseAnim = CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut);
 
     _orbCtrl = AnimationController(
         vsync: this, duration: const Duration(seconds: 8))
       ..repeat(reverse: true);
-    _orbAnim =
-        CurvedAnimation(parent: _orbCtrl, curve: Curves.easeInOut);
+    _orbAnim = CurvedAnimation(parent: _orbCtrl, curve: Curves.easeInOut);
 
     _particleCtrl = AnimationController(
         vsync: this, duration: const Duration(seconds: 14))
@@ -100,25 +126,37 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
 
     _entryCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 1000));
-    _entryAnim =
-        CurvedAnimation(parent: _entryCtrl, curve: Curves.easeOutCubic);
+    _entryAnim = CurvedAnimation(parent: _entryCtrl, curve: Curves.easeOutCubic);
+
+    _chartAnimationCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1200));
+    _chartAnim = CurvedAnimation(parent: _chartAnimationCtrl, curve: Curves.easeOutCubic);
+
+    _glowCtrl = AnimationController(
+        vsync: this, duration: const Duration(seconds: 2))
+      ..repeat(reverse: true);
+    _glowAnim = CurvedAnimation(parent: _glowCtrl, curve: Curves.easeInOut);
 
     final rng = math.Random(99);
-    for (int i = 0; i < 25; i++) {
+    for (int i = 0; i < 40; i++) {
       _particles.add(_Particle(
         x: rng.nextDouble(),
         y: rng.nextDouble(),
-        radius: rng.nextDouble() * 1.5 + 0.5,
+        radius: rng.nextDouble() * 2.0 + 0.5,
         speed: rng.nextDouble() * 0.3 + 0.1,
-        opacity: rng.nextDouble() * 0.3 + 0.05,
+        opacity: rng.nextDouble() * 0.4 + 0.05,
         phase: rng.nextDouble(),
       ));
     }
 
     _animationsReady = true;
 
-    Future.delayed(const Duration(milliseconds: 100),
-            () { if (mounted) _entryCtrl.forward(); });
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        _entryCtrl.forward();
+        _chartAnimationCtrl.forward();
+      }
+    });
   }
 
   @override
@@ -128,11 +166,13 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
     _particleCtrl.dispose();
     _entryCtrl.dispose();
     _shimmerCtrl.dispose();
+    _chartAnimationCtrl.dispose();
+    _glowCtrl.dispose();
     super.dispose();
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  DATA LOADING
+  //  DATA LOADING (same as original)
   // ═══════════════════════════════════════════════════════════════
   Future<void> _loadData() async {
     setState(() {
@@ -141,40 +181,32 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
     });
 
     try {
-      // Load settings - with default fallback
       GetvaCoinSettings? settings;
       try {
         final settingsResponse = await ApiService.getGetvaCoinSettings();
-        print('GetvaCoinSettings response: $settingsResponse');
         if (settingsResponse != null && settingsResponse['success'] == true) {
           settings = GetvaCoinSettings.fromJson(settingsResponse['data'] ?? {});
-          print('Parsed settings isEnabled: ${settings.isEnabled}');
         }
       } catch (e) {
         print('Error loading settings: $e');
       }
 
-      // Load packages - with default fallback
       List<GetvaCoinPackage> packages = [];
       try {
         final packagesResponse = await ApiService.getGetvaCoinPackages();
-        print('GetvaCoinPackages response: $packagesResponse');
         if (packagesResponse != null && packagesResponse['success'] == true) {
           final list = packagesResponse['data'] as List<dynamic>? ?? [];
           packages = list.map((p) => GetvaCoinPackage.fromJson(p)).toList();
-          print('Loaded ${packages.length} packages');
         }
       } catch (e) {
         print('Error loading packages: $e');
       }
 
-      // Load wallet
       GetvaCoinWallet? wallet;
       try {
         final userId = await SessionManager.getUserId();
         if (userId != null) {
           final walletResponse = await ApiService.getGetvaCoinWallet(userId);
-          print('GetvaCoinWallet response: $walletResponse');
           if (walletResponse != null &&
               walletResponse['success'] == true &&
               walletResponse['data'] != null) {
@@ -185,17 +217,14 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
         print('Error loading wallet: $e');
       }
 
-      // Load transactions
       List<GetvaCoinTransaction> transactions = [];
       try {
         final userId = await SessionManager.getUserId();
         if (userId != null) {
           final txnResponse = await ApiService.getGetvaCoinTransactions(userId);
-          print('GetvaCoinTransactions response: $txnResponse');
           if (txnResponse != null && txnResponse['success'] == true) {
             final txnList = txnResponse['data'] as List<dynamic>? ?? [];
-            transactions =
-                txnList.map((t) => GetvaCoinTransaction.fromJson(t)).toList();
+            transactions = txnList.map((t) => GetvaCoinTransaction.fromJson(t)).toList();
           }
         }
       } catch (e) {
@@ -222,12 +251,8 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  //  PURCHASE
-  // ═══════════════════════════════════════════════════════════════
   Future<void> _purchaseCoins() async {
-    if (_selectedPackageIndex < 0 ||
-        _selectedPackageIndex >= _packages.length) {
+    if (_selectedPackageIndex < 0 || _selectedPackageIndex >= _packages.length) {
       _showError('Please select a package');
       return;
     }
@@ -282,7 +307,7 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  BUILD
+  //  ENHANCED BUILD METHOD
   // ═══════════════════════════════════════════════════════════════
   @override
   Widget build(BuildContext context) {
@@ -293,23 +318,31 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
       backgroundColor: _surface,
       body: Stack(
         children: [
-          // Background gradient
+          // Enhanced Background with animated gradient
           Positioned.fill(
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Color(0xFF080714),
-                    Color(0xFF0A0910),
-                    Color(0xFF060512),
-                  ],
-                ),
-              ),
+            child: AnimatedBuilder(
+              animation: _glowAnim,
+              builder: (context, child) {
+                return Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color(0xFF080714),
+                        Color(0xFF0A0910),
+                        Color(0xFF060512),
+                        Color(0xFF0B0820),
+                      ],
+                      stops: [0.0, 0.4, 0.7, 1.0],
+                    ),
+                  ),
+                );
+              },
             ),
           ),
-          // Animated orbs
+
+          // Animated orbs with enhanced effects
           if (_animationsReady)
             Positioned.fill(
               child: AnimatedBuilder(
@@ -317,38 +350,58 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                 builder: (context, child) => Stack(
                   children: [
                     Positioned(
-                      top: -100 + _orbAnim.value * 40,
-                      left: size.width / 2 - 200,
-                      child: _OrbGlow(
-                        color: _gold.withOpacity(0.08 + _pulseAnim.value * 0.04),
-                        size: 420,
+                      top: -100 + _orbAnim.value * 60,
+                      left: size.width / 2 - 250,
+                      child: _EnhancedOrbGlow(
+                        color: _gold.withOpacity(0.12 + _pulseAnim.value * 0.08),
+                        size: 480,
+                        blurSigma: 80,
                       ),
                     ),
                     Positioned(
-                      bottom: 100 + _orbAnim.value * -30,
-                      right: -100,
-                      child: _OrbGlow(
-                        color: _violet.withOpacity(0.08),
-                        size: 300,
+                      bottom: 80 + _orbAnim.value * -40,
+                      right: -120,
+                      child: _EnhancedOrbGlow(
+                        color: _violet.withOpacity(0.1),
+                        size: 360,
+                        blurSigma: 60,
+                      ),
+                    ),
+                    Positioned(
+                      top: size.height * 0.3,
+                      left: -80,
+                      child: _EnhancedOrbGlow(
+                        color: _cyan.withOpacity(0.05),
+                        size: 280,
+                        blurSigma: 50,
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-          // Particles
+
+          // Enhanced particle system
           if (_animationsReady)
             Positioned.fill(
               child: AnimatedBuilder(
                 animation: _particleCtrl,
                 builder: (context, child) => CustomPaint(
-                  painter: _ParticlePainter(
+                  painter: _EnhancedParticlePainter(
                     particles: _particles,
                     progress: _particleCtrl.value,
                   ),
                 ),
               ),
             ),
+
+          // Glassmorphism overlay
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 0.5, sigmaY: 0.5),
+              child: Container(color: Colors.transparent),
+            ),
+          ),
 
           // Content
           SafeArea(
@@ -365,21 +418,62 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
     );
   }
 
-  // ── Loading ──────────────────────────────────────────────────
+  // ── Enhanced Loading View ────────────────────────────────────
   Widget _buildLoadingView() {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircularProgressIndicator(color: _gold),
-          SizedBox(height: 16),
-          Text('Loading...', style: TextStyle(color: _textMuted, fontSize: 14)),
+          TweenAnimationBuilder(
+            tween: Tween<double>(begin: 0, end: 1),
+            duration: const Duration(milliseconds: 800),
+            builder: (context, value, child) {
+              return Transform.scale(
+                scale: value,
+                child: Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [_gold, _goldDeep],
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: _gold.withOpacity(0.5),
+                        blurRadius: 20,
+                        spreadRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Text('🪙', style: TextStyle(fontSize: 32)),
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Loading Getva Coin...',
+            style: TextStyle(color: _textMuted, fontSize: 14),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: 40,
+            height: 40,
+            child: CircularProgressIndicator(
+              valueColor: const AlwaysStoppedAnimation(_gold),
+              strokeWidth: 3,
+              backgroundColor: _gold.withOpacity(0.2),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  // ── Error ────────────────────────────────────────────────────
+  // ── Enhanced Error View ──────────────────────────────────────
   Widget _buildErrorView() {
     return Center(
       child: Padding(
@@ -387,13 +481,23 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: _rose.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.error_outline, color: _rose, size: 48),
+            TweenAnimationBuilder(
+              tween: Tween<double>(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 600),
+              builder: (context, value, child) {
+                return Transform.scale(
+                  scale: value,
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: _rose.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: _rose.withOpacity(0.3), width: 2),
+                    ),
+                    child: const Icon(Icons.error_outline, color: _rose, size: 48),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 24),
             Text(
@@ -405,8 +509,7 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
             GestureDetector(
               onTap: _loadData,
               child: Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(colors: [_gold, _goldDeep]),
                   borderRadius: BorderRadius.circular(14),
@@ -434,7 +537,6 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
     );
   }
 
-  // ── Disabled ─────────────────────────────────────────────────
   Widget _buildDisabledView() {
     return Center(
       child: Column(
@@ -445,9 +547,9 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
             decoration: BoxDecoration(
               color: _textMuted.withOpacity(0.08),
               shape: BoxShape.circle,
+              border: Border.all(color: _textMuted.withOpacity(0.2), width: 1),
             ),
-            child:
-            const Icon(Icons.block_rounded, color: _textMuted, size: 48),
+            child: const Icon(Icons.block_rounded, color: _textMuted, size: 48),
           ),
           const SizedBox(height: 20),
           const Text(
@@ -460,65 +562,49 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
     );
   }
 
-  // ── Main Content ─────────────────────────────────────────────
+  // ── Enhanced Main Content ────────────────────────────────────
   Widget _buildContent() {
     return RefreshIndicator(
       onRefresh: _loadData,
       color: _gold,
       backgroundColor: _cardBg,
       child: CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(
-            parent: BouncingScrollPhysics()),
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
         slivers: [
-          _buildAppBar(),
+          _buildEnhancedAppBar(),
           const SliverToBoxAdapter(child: SizedBox(height: 16)),
           SliverToBoxAdapter(
-            child: _AnimatedReveal(
-                animation: _entryAnim, delay: 0.0, child: _buildHeroCard()),
+            child: _AnimatedReveal(animation: _entryAnim, delay: 0.0, child: _buildEnhancedHeroCard()),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
           SliverToBoxAdapter(
-            child: _AnimatedReveal(
-                animation: _entryAnim,
-                delay: 0.1,
-                child: _buildPeriodSelector()),
+            child: _AnimatedReveal(animation: _entryAnim, delay: 0.1, child: _buildEnhancedPeriodSelector()),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
           SliverToBoxAdapter(
-            child: _AnimatedReveal(
-                animation: _entryAnim,
-                delay: 0.2,
-                child: _buildChartSection()),
+            child: _AnimatedReveal(animation: _entryAnim, delay: 0.2, child: _buildEnhancedChartSection()),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
           SliverToBoxAdapter(
-            child: _AnimatedReveal(
-                animation: _entryAnim,
-                delay: 0.3,
-                child: _buildExchangeRateCard()),
+            child: _AnimatedReveal(animation: _entryAnim, delay: 0.25, child: _buildEnhancedStatsRow()),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          SliverToBoxAdapter(
+            child: _AnimatedReveal(animation: _entryAnim, delay: 0.3, child: _buildEnhancedExchangeRateCard()),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
           if (_settings?.promotionActive == true)
             SliverToBoxAdapter(
-              child: _AnimatedReveal(
-                  animation: _entryAnim,
-                  delay: 0.35,
-                  child: _buildPromotionCard()),
+              child: _AnimatedReveal(animation: _entryAnim, delay: 0.35, child: _buildEnhancedPromotionCard()),
             ),
           if (_settings?.promotionActive == true)
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           SliverToBoxAdapter(
-            child: _AnimatedReveal(
-                animation: _entryAnim,
-                delay: 0.4,
-                child: _buildPackagesSection()),
+            child: _AnimatedReveal(animation: _entryAnim, delay: 0.4, child: _buildEnhancedPackagesSection()),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
           SliverToBoxAdapter(
-            child: _AnimatedReveal(
-                animation: _entryAnim,
-                delay: 0.5,
-                child: _buildTransactionsSection()),
+            child: _AnimatedReveal(animation: _entryAnim, delay: 0.5, child: _buildEnhancedTransactionsSection()),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 50)),
         ],
@@ -527,20 +613,19 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  SECTION WIDGETS
+  //  ENHANCED SECTION WIDGETS
   // ═══════════════════════════════════════════════════════════════
 
-  Widget _buildAppBar() {
+  Widget _buildEnhancedAppBar() {
     final balance = _wallet?.coinBalance ?? 0.0;
     return SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         child: Row(
           children: [
-            _GlassButton(
+            _EnhancedGlassButton(
               onTap: () => Navigator.pop(context),
-              child: const Icon(Icons.arrow_back_ios_new_rounded,
-                  color: Colors.white, size: 18),
+              child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
             ),
             const SizedBox(width: 16),
             Column(
@@ -549,22 +634,23 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                 const Text(
                   'Getva Coin',
                   style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900),
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.5,
+                  ),
                 ),
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: _gold.withOpacity(0.15),
+                        gradient: const LinearGradient(colors: [_gold, _goldDeep]),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: const Text('GVC',
                           style: TextStyle(
-                              color: _gold,
+                              color: Colors.white,
                               fontSize: 10,
                               fontWeight: FontWeight.w800)),
                     ),
@@ -581,10 +667,9 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
               ],
             ),
             const Spacer(),
-            _GlassButton(
+            _EnhancedGlassButton(
               onTap: () {},
-              child: const Icon(Icons.history_rounded,
-                  color: Colors.white, size: 20),
+              child: const Icon(Icons.history_rounded, color: Colors.white, size: 20),
             ),
           ],
         ),
@@ -592,135 +677,176 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
     );
   }
 
-  /// Hero wallet card — replaces the static price card with real wallet data
-  Widget _buildHeroCard() {
+  Widget _buildEnhancedHeroCard() {
     final balance = _wallet?.coinBalance ?? 0.0;
     final rate = _settings?.exchangeRate ?? 1.0;
     final valueInRupees = balance * rate;
-    final isPositiveDay = true; // can be driven by API later
+    final isPositiveDay = true;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [_cardBg, _cardBg2],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: _border),
-          boxShadow: [
-            BoxShadow(
-                color: _gold.withOpacity(0.1),
-                blurRadius: 30,
-                offset: const Offset(0, 10)),
-          ],
-        ),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: AnimatedBuilder(
+        animation: _glowAnim,
+        builder: (context, child) {
+          return Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [_cardBg, _cardBg2],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(32),
+              border: Border.all(
+                color: _gold.withOpacity(0.3 + _glowAnim.value * 0.2),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: _gold.withOpacity(0.15 + _glowAnim.value * 0.1),
+                  blurRadius: 30,
+                  spreadRadius: 5,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Your Coin Balance',
-                      style: TextStyle(
-                          color: _textMuted,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          '🪙 ${balance.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 36,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -1,
+                        const Text(
+                          'Your Coin Balance',
+                          style: TextStyle(
+                            color: _textMuted,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
                           ),
                         ),
-                        const Padding(
-                          padding: EdgeInsets.only(bottom: 6, left: 6),
+                        const SizedBox(height: 8),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              '🪙 ${balance.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 36,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -1,
+                              ),
+                            ),
+                            const Padding(
+                              padding: EdgeInsets.only(bottom: 6, left: 6),
+                              child: Text(
+                                'GVC',
+                                style: TextStyle(
+                                    color: _textMuted,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _gold.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                           child: Text(
-                            'GVC',
+                            '≈ ₹${valueInRupees.toStringAsFixed(2)} INR',
                             style: TextStyle(
-                                color: _textMuted,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500),
+                              color: _gold,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '≈ ₹${valueInRupees.toStringAsFixed(2)} INR',
-                      style: TextStyle(
-                          color: _gold.withOpacity(0.8),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600),
+                    TweenAnimationBuilder(
+                      tween: Tween<double>(begin: 0, end: 1),
+                      duration: const Duration(milliseconds: 800),
+                      builder: (context, value, child) {
+                        return Transform.scale(
+                          scale: 0.8 + value * 0.2,
+                          child: Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [_goldDeep, _gold, _goldBright],
+                              ),
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _gold.withOpacity(0.5),
+                                  blurRadius: 20,
+                                  spreadRadius: 5,
+                                ),
+                              ],
+                            ),
+                            child: const Center(
+                              child: Text('🪙', style: TextStyle(fontSize: 32)),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                        colors: [_goldDeep, _gold]),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                          color: _gold.withOpacity(0.35), blurRadius: 15)
-                    ],
-                  ),
-                  child: const Center(
-                    child: Text('🪙', style: TextStyle(fontSize: 28)),
-                  ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    _buildEnhancedMiniTrend(
+                      '${isPositiveDay ? '+' : ''}${(rate * 100 - 100).toStringAsFixed(2)}%',
+                      isPositiveDay,
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: _green.withOpacity(0.3)),
+                      ),
+                      child: Text(
+                        '1 GVC = ₹${rate.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          color: _green,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                _buildMiniTrend(
-                    '${isPositiveDay ? '+' : ''}${(rate * 100 - 100).toStringAsFixed(2)}%',
-                    isPositiveDay),
-                const SizedBox(width: 12),
-                Text(
-                  '1 GVC = ₹${rate.toStringAsFixed(2)}',
-                  style: TextStyle(
-                      color: _green.withOpacity(0.8),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildMiniTrend(String value, bool isUp) {
+  Widget _buildEnhancedMiniTrend(String value, bool isUp) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: (isUp ? _green : _rose).withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: (isUp ? _green : _rose).withOpacity(0.3)),
       ),
       child: Row(
         children: [
           Icon(
-            isUp
-                ? Icons.arrow_upward_rounded
-                : Icons.arrow_downward_rounded,
+            isUp ? Icons.trending_up_rounded : Icons.trending_down_rounded,
             color: isUp ? _green : _rose,
             size: 12,
           ),
@@ -728,241 +854,580 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
           Text(
             value,
             style: TextStyle(
-                color: isUp ? _green : _rose,
-                fontSize: 12,
-                fontWeight: FontWeight.w800),
+              color: isUp ? _green : _rose,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPeriodSelector() {
+  Widget _buildEnhancedPeriodSelector() {
     final periods = ['1H', '24H', '1W', '1M', '1Y'];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: periods
-            .map((p) => GestureDetector(
-          onTap: () => setState(() => _selectedPeriod = p),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              gradient: _selectedPeriod == p
-                  ? const LinearGradient(
-                  colors: [_goldDeep, _gold])
-                  : null,
-              color: _selectedPeriod == p
-                  ? null
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: _selectedPeriod == p
-                    ? _gold.withOpacity(0.5)
-                    : _border,
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: _cardBg.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _border),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: periods.map((p) => Expanded(
+            child: GestureDetector(
+              onTap: () {
+                setState(() => _selectedPeriod = p);
+                _updateChartDataForPeriod(p);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                decoration: BoxDecoration(
+                  gradient: _selectedPeriod == p
+                      ? const LinearGradient(colors: [_goldDeep, _gold])
+                      : null,
+                  color: _selectedPeriod == p ? null : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  p,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _selectedPeriod == p ? Colors.white : _textMuted,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                  ),
+                ),
               ),
             ),
-            child: Text(
-              p,
-              style: TextStyle(
-                color: _selectedPeriod == p
-                    ? Colors.white
-                    : _textMuted,
-                fontWeight: FontWeight.w800,
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ))
-            .toList(),
+          )).toList(),
+        ),
       ),
     );
   }
 
-  Widget _buildChartSection() {
-    // Chart uses static demo data (price history from API can be wired here)
+  void _updateChartDataForPeriod(String period) {
+    // Simulate chart data update based on period
+    final random = math.Random(42);
+    double price = 38.5;
+    int points = period == '1H' ? 24 : period == '24H' ? 30 : period == '1W' ? 50 : period == '1M' ? 60 : 100;
+    List<double> data = [];
+    for (int i = 0; i < points; i++) {
+      double change = (random.nextDouble() - 0.5) * (period == '1Y' ? 3.0 : 2.0);
+      price = (price + change).clamp(35.0, 48.0);
+      data.add(price);
+    }
+    setState(() {
+      _chartData = data;
+      _priceSpots = List.generate(data.length, (i) => FlSpot(i.toDouble(), data[i]));
+    });
+    _chartAnimationCtrl.reset();
+    _chartAnimationCtrl.forward();
+  }
+
+  Widget _buildEnhancedChartSection() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        height: 220,
-        padding: const EdgeInsets.fromLTRB(10, 20, 20, 10),
-        decoration: BoxDecoration(
-          color: _cardBg2,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: _border),
-        ),
-        child: LineChart(
-          LineChartData(
-            gridData: const FlGridData(show: false),
-            titlesData: const FlTitlesData(show: false),
-            borderData: FlBorderData(show: false),
-            lineBarsData: [
-              LineChartBarData(
-                spots: const [
-                  FlSpot(0, 38),
-                  FlSpot(1, 41),
-                  FlSpot(2, 39.5),
-                  FlSpot(3, 43),
-                  FlSpot(4, 41.5),
-                  FlSpot(5, 44),
-                  FlSpot(6, 42.85),
-                ],
-                isCurved: true,
-                gradient:
-                const LinearGradient(colors: [_goldDeep, _gold]),
-                barWidth: 4,
-                isStrokeCapRound: true,
-                dotData: const FlDotData(show: false),
-                belowBarData: BarAreaData(
-                  show: true,
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      _gold.withOpacity(0.25),
-                      Colors.transparent,
+      child: AnimatedBuilder(
+        animation: _chartAnim,
+        builder: (context, child) {
+          return Container(
+            height: 260,
+            padding: const EdgeInsets.fromLTRB(12, 20, 20, 12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [_cardBg2, _cardBg],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: _border),
+              boxShadow: [
+                BoxShadow(
+                  color: _gold.withOpacity(0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _gold.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'Price Chart',
+                        style: TextStyle(
+                          color: _gold,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    _buildChartLegend(),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: Stack(
+                    children: [
+                      LineChart(
+                        LineChartData(
+                          gridData: FlGridData(
+                            show: true,
+                            drawVerticalLine: false,
+                            horizontalInterval: 2,
+                            getDrawingHorizontalLine: (value) {
+                              return FlLine(
+                                color: _textMuted.withOpacity(0.1),
+                                strokeWidth: 1,
+                                dashArray: [5, 5],
+                              );
+                            },
+                          ),
+                          titlesData: FlTitlesData(
+                            show: true,
+                            bottomTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 25,
+                                getTitlesWidget: (value, meta) {
+                                  int index = value.toInt();
+                                  if (index % 5 == 0 && index < _chartData.length) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(top: 8),
+                                      child: Text(
+                                        '${index + 1}d',
+                                        style: const TextStyle(
+                                          color: _textMuted,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  return const SizedBox.shrink();
+                                },
+                              ),
+                            ),
+                            leftTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 45,
+                                getTitlesWidget: (value, meta) {
+                                  return Text(
+                                    '₹${value.toStringAsFixed(0)}',
+                                    style: const TextStyle(
+                                      color: _textMuted,
+                                      fontSize: 10,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          ),
+                          borderData: FlBorderData(show: false),
+                          lineBarsData: [
+                            LineChartBarData(
+                              spots: _priceSpots.map((spot) => FlSpot(spot.x, spot.y * _chartAnim.value)).toList(),
+                              isCurved: true,
+                              gradient: const LinearGradient(
+                                colors: [_goldDeep, _gold, _goldBright],
+                              ),
+                              barWidth: 4,
+                              isStrokeCapRound: true,
+                              dotData: const FlDotData(show: false),
+                              belowBarData: BarAreaData(
+                                show: true,
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    _gold.withOpacity(0.35),
+                                    _gold.withOpacity(0.1),
+                                    Colors.transparent,
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                          lineTouchData: LineTouchData(
+                            touchTooltipData: LineTouchTooltipData(
+                              tooltipRoundedRadius: 12,
+                              tooltipBorder: BorderSide(color: _gold.withOpacity(0.5), width: 1),
+                              getTooltipItems: (List<LineBarSpot> touchedSpots) {
+                                return touchedSpots.map((spot) {
+                                  return LineTooltipItem(
+                                    '₹${spot.y.toStringAsFixed(2)}',
+                                    const TextStyle(color: _gold, fontWeight: FontWeight.bold, fontSize: 12),
+                                  );
+                                }).toList();
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Animated glow effect on chart
+                      Positioned(
+                        right: 10,
+                        top: 10,
+                        child: AnimatedBuilder(
+                          animation: _glowAnim,
+                          builder: (context, child) {
+                            return Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: RadialGradient(
+                                  colors: [
+                                    _gold.withOpacity(0.3 + _glowAnim.value * 0.2),
+                                    Colors.transparent,
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                     ],
                   ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildChartLegend() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: _textMuted.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+              color: _gold,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          const Text(
+            'GVC Price',
+            style: TextStyle(color: _textMuted, fontSize: 10),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEnhancedStatsRow() {
+    final rate = _settings?.exchangeRate ?? 1.0;
+    final volume = 2456789;
+    final marketCap = 12500000;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildEnhancedStatCard('Exchange Rate', '₹${rate.toStringAsFixed(2)}', Icons.currency_exchange, _cyan),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildEnhancedStatCard('24h Volume', '₹${(volume / 1000000).toStringAsFixed(1)}M', Icons.trending_up, _green),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildEnhancedStatCard('Market Cap', '₹${(marketCap / 1000000).toStringAsFixed(0)}M', Icons.show_chart, _gold),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEnhancedStatCard(String title, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [_cardBg, _cardBg2],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 16),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: _textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildExchangeRateCard() {
+  Widget _buildEnhancedExchangeRateCard() {
     final rate = _settings?.exchangeRate ?? 1.0;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: _cardBg,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _border),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: _cyan.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.currency_exchange,
-                  color: _cyan, size: 26),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Exchange Rate',
-                    style: TextStyle(
-                        color: _textMuted,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '1 GVC = ₹${rate.toStringAsFixed(2)} INR',
-                    style: const TextStyle(
-                        color: _textPrimary,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800),
-                  ),
+      child: AnimatedBuilder(
+        animation: _pulseAnim,
+        builder: (context, child) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  _cardBg,
+                  _cardBg2,
                 ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: _gold.withOpacity(0.2 + _pulseAnim.value * 0.1),
+                width: 1.5,
               ),
             ),
-          ],
-        ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [_cyan, Color(0xFF00A3FF)],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(Icons.currency_exchange, color: Colors.white, size: 26),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Current Exchange Rate',
+                        style: TextStyle(
+                          color: _textMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '1 GVC = ₹${rate.toStringAsFixed(2)} INR',
+                        style: const TextStyle(
+                          color: _textPrimary,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Last updated: Just now',
+                        style: TextStyle(
+                          color: _textMuted.withOpacity(0.7),
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.arrow_upward, color: _green, size: 16),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 
-  /// Promotion banner (only shown when promotionActive == true)
-  Widget _buildPromotionCard() {
+  Widget _buildEnhancedPromotionCard() {
     final promotion = _settings;
     if (promotion == null || !promotion.promotionActive) {
       return const SizedBox.shrink();
     }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              _green.withOpacity(0.18),
-              _cyan.withOpacity(0.08),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _green.withOpacity(0.3)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
+      child: TweenAnimationBuilder(
+        tween: Tween<double>(begin: 0, end: 1),
+        duration: const Duration(milliseconds: 600),
+        builder: (context, value, child) {
+          return Transform.scale(
+            scale: 0.95 + value * 0.05,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: _green.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child:
-              const Icon(Icons.celebration, color: _green, size: 26),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '🎉 Limited Time Offer!',
-                    style: TextStyle(
-                        color: _green,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Get ${promotion.promotionBonus}% bonus on purchases above ${promotion.promotionMinPurchase} coins!',
-                    style: const TextStyle(
-                        color: _textPrimary, fontSize: 12),
+                gradient: LinearGradient(
+                  colors: [
+                    _green.withOpacity(0.2),
+                    _cyan.withOpacity(0.1),
+                    _green.withOpacity(0.15),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: _green.withOpacity(0.4), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: _green.withOpacity(0.2),
+                    blurRadius: 20,
+                    spreadRadius: 2,
                   ),
                 ],
               ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [_green, Color(0xFF2E7D32)],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(Icons.celebration, color: Colors.white, size: 26),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '🎉 LIMITED TIME OFFER! 🎉',
+                          style: TextStyle(
+                            color: _green,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Get ${promotion.promotionBonus}% bonus coins on purchases above ${promotion.promotionMinPurchase} coins!',
+                          style: const TextStyle(
+                            color: _textPrimary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: _green, size: 24),
+                ],
+              ),
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
-  /// Packages section — real packages from API, with bonus calculation
-  Widget _buildPackagesSection() {
+  Widget _buildEnhancedPackagesSection() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'BUY COINS',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w900,
-              color: _gold,
-              letterSpacing: 2,
-            ),
+          Row(
+            children: [
+              Container(
+                width: 4,
+                height: 20,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [_gold, _goldDeep]),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'BUY COINS',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  color: _gold,
+                  letterSpacing: 2,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _gold.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'BEST DEALS',
+                  style: TextStyle(
+                    color: _gold,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           if (_packages.isEmpty)
@@ -981,193 +1446,198 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
               ),
             )
           else
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _packages.length,
-              itemBuilder: (context, index) {
-                final package = _packages[index];
-                final isSelected = _selectedPackageIndex == index;
+            ...List.generate(_packages.length, (index) {
+              final package = _packages[index];
+              final isSelected = _selectedPackageIndex == index;
+              final bonus = _settings?.promotionActive == true &&
+                  package.coinAmount >= (_settings?.promotionMinPurchase ?? 0)
+                  ? (package.coinAmount * (_settings?.promotionBonus ?? 0) / 100).round()
+                  : 0;
 
-                final bonus = _settings?.promotionActive == true &&
-                    package.coinAmount >=
-                        (_settings?.promotionMinPurchase ?? 0)
-                    ? (package.coinAmount *
-                    (_settings?.promotionBonus ?? 0) /
-                    100)
-                    .round()
-                    : 0;
-
-                return GestureDetector(
-                  onTap: () =>
-                      setState(() => _selectedPackageIndex = index),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: isSelected
-                          ? LinearGradient(
-                        colors: [
-                          _gold.withOpacity(0.12),
-                          _goldDeep.withOpacity(0.06),
-                        ],
-                      )
-                          : null,
-                      color: isSelected ? null : _cardBg,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: isSelected ? _gold : _border,
-                        width: isSelected ? 2 : 1,
-                      ),
-                      boxShadow: isSelected
-                          ? [
-                        BoxShadow(
-                          color: _gold.withOpacity(0.15),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
-                        )
-                      ]
-                          : null,
+              return GestureDetector(
+                onTap: () => setState(() => _selectedPackageIndex = index),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: isSelected
+                        ? LinearGradient(
+                      colors: [
+                        _gold.withOpacity(0.15),
+                        _goldDeep.withOpacity(0.08),
+                        _cardBg,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                        : null,
+                    color: isSelected ? null : _cardBg,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected ? _gold : _border,
+                      width: isSelected ? 2 : 1,
                     ),
-                    child: Row(
-                      children: [
-                        // Coin icon
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? _gold.withOpacity(0.2)
-                                : _gold.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(14),
-                            border: isSelected
-                                ? Border.all(
-                                color: _gold.withOpacity(0.4))
-                                : null,
-                          ),
-                          child: Center(
-                            child: Text(
-                              '🪙',
-                              style: TextStyle(
-                                  fontSize: isSelected ? 26 : 22),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        // Coin amount + bonus
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment:
-                            CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Text(
-                                    '${package.coinAmount}',
-                                    style: TextStyle(
-                                      color: isSelected
-                                          ? _gold
-                                          : _textPrimary,
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                  const Text(
-                                    ' Coins',
-                                    style: TextStyle(
-                                        color: _textMuted,
-                                        fontSize: 13),
-                                  ),
-                                ],
+                    boxShadow: isSelected
+                        ? [
+                      BoxShadow(
+                        color: _gold.withOpacity(0.2),
+                        blurRadius: 20,
+                        spreadRadius: 2,
+                        offset: const Offset(0, 5),
+                      )
+                    ]
+                        : null,
+                  ),
+                  child: Row(
+                    children: [
+                      // Animated coin icon
+                      TweenAnimationBuilder(
+                        tween: Tween<double>(begin: 1, end: isSelected ? 1.1 : 1),
+                        duration: const Duration(milliseconds: 200),
+                        builder: (context, scale, child) {
+                          return Transform.scale(
+                            scale: scale,
+                            child: Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                gradient: isSelected
+                                    ? const LinearGradient(colors: [_goldDeep, _gold])
+                                    : LinearGradient(
+                                  colors: [_gold.withOpacity(0.3), _gold.withOpacity(0.1)],
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                                border: isSelected
+                                    ? Border.all(color: _gold.withOpacity(0.5), width: 1)
+                                    : null,
                               ),
-                              if (bonus > 0) ...[
-                                const SizedBox(height: 4),
-                                Container(
-                                  padding:
-                                  const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: _green.withOpacity(0.15),
-                                    borderRadius:
-                                    BorderRadius.circular(6),
+                              child: Center(
+                                child: Text(
+                                  '🪙',
+                                  style: TextStyle(fontSize: isSelected ? 28 : 24),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 14),
+                      // Coin amount + bonus
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  '${package.coinAmount}',
+                                  style: TextStyle(
+                                    color: isSelected ? _gold : _textPrimary,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w900,
                                   ),
-                                  child: Text(
-                                    '+$bonus Bonus Coins!',
-                                    style: const TextStyle(
-                                      color: _green,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                    ),
+                                ),
+                                const Text(
+                                  ' Coins',
+                                  style: TextStyle(
+                                    color: _textMuted,
+                                    fontSize: 13,
                                   ),
                                 ),
                               ],
-                            ],
-                          ),
-                        ),
-                        // Price
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              '₹${package.priceInRupees.toStringAsFixed(0)}',
-                              style: TextStyle(
-                                color:
-                                isSelected ? _gold : _textPrimary,
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
+                            ),
+                            if (bonus > 0) ...[
+                              const SizedBox(height: 6),
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 300),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [_green, Color(0xFF2E7D32)],
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '+$bonus BONUS',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
                               ),
-                            ),
-                            Text(
-                              '₹${package.ratePerCoin.toStringAsFixed(2)}/coin',
-                              style: const TextStyle(
-                                  color: _textMuted, fontSize: 10),
-                            ),
+                            ],
                           ],
                         ),
-                        if (isSelected) ...[
-                          const SizedBox(width: 10),
-                          const Icon(Icons.check_circle_rounded,
-                              color: _gold, size: 20),
+                      ),
+                      // Price
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '₹${package.priceInRupees.toStringAsFixed(0)}',
+                            style: TextStyle(
+                              color: isSelected ? _gold : _textPrimary,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          Text(
+                            '₹${package.ratePerCoin.toStringAsFixed(2)}/coin',
+                            style: const TextStyle(color: _textMuted, fontSize: 10),
+                          ),
                         ],
+                      ),
+                      if (isSelected) ...[
+                        const SizedBox(width: 10),
+                        const Icon(Icons.check_circle_rounded, color: _gold, size: 22),
                       ],
-                    ),
-                  ),
-                );
-              },
-            ),
-
-          // BUY button — visible when a package is selected
-          if (_selectedPackageIndex >= 0)
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: GestureDetector(
-                onTap: _purchaseCoins,
-                child: Container(
-                  width: double.infinity,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                        colors: [_goldDeep, _gold]),
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: [
-                      BoxShadow(
-                          color: _gold.withOpacity(0.35),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8)),
                     ],
                   ),
-                  child: const Center(
-                    child: Text(
-                      'BUY NOW 🪙',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.5,
+                ),
+              );
+            }),
+
+          // Enhanced BUY button
+          if (_selectedPackageIndex >= 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 20),
+              child: GestureDetector(
+                onTap: _purchaseCoins,
+                child: AnimatedBuilder(
+                  animation: _pulseAnim,
+                  builder: (context, child) {
+                    return Container(
+                      width: double.infinity,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [_goldDeep, _gold, _goldBright],
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _gold.withOpacity(0.4 + _pulseAnim.value * 0.2),
+                            blurRadius: 25,
+                            spreadRadius: 2,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
                       ),
-                    ),
-                  ),
+                      child: const Center(
+                        child: Text(
+                          'BUY NOW 🪙',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
@@ -1176,40 +1646,57 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
     );
   }
 
-  /// Transaction history from real API
-  Widget _buildTransactionsSection() {
+  Widget _buildEnhancedTransactionsSection() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'RECENT TRANSACTIONS',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w900,
-              color: _gold,
-              letterSpacing: 2,
-            ),
+          Row(
+            children: [
+              Container(
+                width: 4,
+                height: 20,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [_gold, _goldDeep]),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'RECENT TRANSACTIONS',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  color: _gold,
+                  letterSpacing: 2,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           if (_transactions.isEmpty)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(28),
+              padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
                 color: _cardBg,
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: _border),
               ),
               child: Column(
                 children: [
                   Icon(Icons.receipt_long_rounded,
-                      color: _textMuted.withOpacity(0.5), size: 36),
-                  const SizedBox(height: 10),
+                      color: _textMuted.withOpacity(0.5), size: 48),
+                  const SizedBox(height: 12),
                   const Text(
                     'No transactions yet',
                     style: TextStyle(color: _textMuted, fontSize: 14),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Your first purchase will appear here',
+                    style: TextStyle(color: _textMuted.withOpacity(0.7), fontSize: 12),
                   ),
                 ],
               ),
@@ -1218,73 +1705,89 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount:
-              _transactions.length > 10 ? 10 : _transactions.length,
+              itemCount: _transactions.length > 8 ? 8 : _transactions.length,
               itemBuilder: (context, index) {
                 final txn = _transactions[index];
                 final isPositive = txn.transactionType == 'purchase' ||
                     txn.transactionType == 'reward';
                 final color = isPositive ? _green : _rose;
 
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: _cardBg,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: _border),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: color.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          isPositive
-                              ? Icons.arrow_downward_rounded
-                              : Icons.arrow_upward_rounded,
-                          color: color,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment:
-                          CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              txn.transactionType.toUpperCase(),
-                              style: TextStyle(
-                                color: color,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.5,
+                return TweenAnimationBuilder(
+                  tween: Tween<double>(begin: 0, end: 1),
+                  duration: Duration(milliseconds: 300 + (index * 50)),
+                  builder: (context, value, child) {
+                    return Transform.translate(
+                      offset: Offset(20 * (1 - value), 0),
+                      child: Opacity(
+                        opacity: value,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: _cardBg,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: _border),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: color.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  isPositive
+                                      ? Icons.arrow_downward_rounded
+                                      : Icons.arrow_upward_rounded,
+                                  color: color,
+                                  size: 22,
+                                ),
                               ),
-                            ),
-                            Text(
-                              txn.description ??
-                                  '${txn.amount.toStringAsFixed(0)} coins',
-                              style: const TextStyle(
-                                  color: _textMuted, fontSize: 11),
-                            ),
-                          ],
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      txn.transactionType.toUpperCase(),
+                                      style: TextStyle(
+                                        color: color,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      txn.description ??
+                                          '${txn.amount.toStringAsFixed(0)} coins',
+                                      style: const TextStyle(
+                                          color: _textMuted, fontSize: 11),
+                                    ),
+                                    Text(
+                                      _formatDate(txn.createdAt),
+                                      style: const TextStyle(
+                                          color: _textMuted, fontSize: 9),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Text(
+                                '${isPositive ? '+' : '-'}${txn.amount.toStringAsFixed(0)}',
+                                style: TextStyle(
+                                  color: color,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      Text(
-                        '${isPositive ? '+' : '-'}${txn.amount.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          color: color,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
-                  ),
+                    );
+                  },
                 );
               },
             ),
@@ -1292,17 +1795,32 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
       ),
     );
   }
+
+  String _formatDate(DateTime? date) {
+    if (date == null) return '';
+    final now = DateTime.now();
+    final diff = now.difference(date);
+    if (diff.inDays > 0) {
+      return '${diff.inDays}d ago';
+    } else if (diff.inHours > 0) {
+      return '${diff.inHours}h ago';
+    } else if (diff.inMinutes > 0) {
+      return '${diff.inMinutes}m ago';
+    } else {
+      return 'Just now';
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  HELPER WIDGETS
+//  ENHANCED HELPER WIDGETS
 // ═══════════════════════════════════════════════════════════════
 
-class _GlassButton extends StatelessWidget {
+class _EnhancedGlassButton extends StatelessWidget {
   final VoidCallback onTap;
   final Widget child;
 
-  const _GlassButton({required this.onTap, required this.child});
+  const _EnhancedGlassButton({required this.onTap, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -1312,10 +1830,14 @@ class _GlassButton extends StatelessWidget {
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.07),
+          gradient: LinearGradient(
+            colors: [
+              Colors.white.withOpacity(0.1),
+              Colors.white.withOpacity(0.05),
+            ],
+          ),
           borderRadius: BorderRadius.circular(14),
-          border:
-          Border.all(color: Colors.white.withOpacity(0.08)),
+          border: Border.all(color: Colors.white.withOpacity(0.12)),
         ),
         child: Center(child: child),
       ),
@@ -1323,21 +1845,33 @@ class _GlassButton extends StatelessWidget {
   }
 }
 
-class _OrbGlow extends StatelessWidget {
+class _EnhancedOrbGlow extends StatelessWidget {
   final Color color;
   final double size;
+  final double blurSigma;
 
-  const _OrbGlow({required this.color, required this.size});
+  const _EnhancedOrbGlow({
+    required this.color,
+    required this.size,
+    this.blurSigma = 50,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient:
-        RadialGradient(colors: [color, color.withOpacity(0)]),
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: RadialGradient(
+              colors: [color, color.withOpacity(0)],
+              stops: const [0.0, 0.7],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1345,7 +1879,6 @@ class _OrbGlow extends StatelessWidget {
 
 class _Particle {
   final double x, y, radius, speed, opacity, phase;
-
   const _Particle({
     required this.x,
     required this.y,
@@ -1356,12 +1889,14 @@ class _Particle {
   });
 }
 
-class _ParticlePainter extends CustomPainter {
+class _EnhancedParticlePainter extends CustomPainter {
   final List<_Particle> particles;
   final double progress;
 
-  const _ParticlePainter(
-      {required this.particles, required this.progress});
+  const _EnhancedParticlePainter({
+    required this.particles,
+    required this.progress,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1370,18 +1905,22 @@ class _ParticlePainter extends CustomPainter {
       final p = particles[i];
       final t = (progress * p.speed + p.phase) % 1.0;
       final y = (p.y - t) % 1.0;
-      final x = p.x +
-          math.sin(t * math.pi * 2 + p.phase * 6) * 0.04;
-      paint.color =
-          (i % 3 != 0 ? _gold : _goldDeep).withOpacity(p.opacity);
+      final x = p.x + math.sin(t * math.pi * 2 + p.phase * 6) * 0.04;
+
+      // Create gradient for each particle
+      final gradientColor = (i % 3 != 0 ? _gold : _goldBright);
+      paint.color = gradientColor.withOpacity(p.opacity * (0.5 + math.sin(progress * math.pi * 2) * 0.3));
+
       canvas.drawCircle(
-          Offset(x * size.width, y * size.height), p.radius, paint);
+        Offset(x * size.width, y * size.height),
+        p.radius,
+        paint,
+      );
     }
   }
 
   @override
-  bool shouldRepaint(_ParticlePainter old) =>
-      old.progress != progress;
+  bool shouldRepaint(_EnhancedParticlePainter old) => old.progress != progress;
 }
 
 class _AnimatedReveal extends StatelessWidget {
@@ -1389,18 +1928,18 @@ class _AnimatedReveal extends StatelessWidget {
   final double delay;
   final Widget child;
 
-  const _AnimatedReveal(
-      {required this.animation,
-        required this.delay,
-        required this.child});
+  const _AnimatedReveal({
+    required this.animation,
+    required this.delay,
+    required this.child,
+  });
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: animation,
       builder: (context, child) {
-        final t =
-        ((animation.value - delay) / (1.0 - delay)).clamp(0.0, 1.0);
+        final t = ((animation.value - delay) / (1.0 - delay)).clamp(0.0, 1.0);
         final curve = Curves.easeOutCubic.transform(t);
         return Opacity(
           opacity: curve,

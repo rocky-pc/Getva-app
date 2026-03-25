@@ -149,6 +149,26 @@ class ApiService {
     }
   }
 
+  // Get the number of times user has purchased a specific box
+  static Future<int> getBoxPurchaseCount(int userId, int boxId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/transactions.php?user_id=$userId&box_id=$boxId&type=purchase'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is List) {
+          return data.length;
+        }
+      }
+      return 0;
+    } catch (e) {
+      print('getBoxPurchaseCount exception: $e');
+      return 0;
+    }
+  }
+
   static Future<Map<String, dynamic>> updateUserCredentials(int userId, {String? email, String? phone, String? password}) async {
     final Map<String, dynamic> data = {};
     if (email != null) data['email'] = email;

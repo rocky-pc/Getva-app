@@ -7,6 +7,7 @@ class MysteryBox {
   final double price;
   final int giftCount;
   final bool isRandom;
+  final int scratchLimit; // Number of scratches allowed per purchase
 
   MysteryBox({
     required this.id,
@@ -17,6 +18,7 @@ class MysteryBox {
     this.price = 0.0,
     this.giftCount = 3,
     this.isRandom = false,
+    this.scratchLimit = 5, // Default to 5 scratches per purchase
   });
 
   factory MysteryBox.fromJson(Map<String, dynamic> json) {
@@ -33,6 +35,14 @@ class MysteryBox {
       }
     }
     
+    // Parse scratch_limit from settings or mystery box config
+    int scratchLimit = 5;
+    if (json['scratch_limit'] != null) {
+      scratchLimit = int.tryParse(json['scratch_limit'].toString()) ?? 5;
+    } else if (json['scratch_card_limit'] != null) {
+      scratchLimit = int.tryParse(json['scratch_card_limit'].toString()) ?? 5;
+    }
+    
     return MysteryBox(
       id: json['id'] ?? 0,
       name: json['name'] ?? '',
@@ -42,6 +52,7 @@ class MysteryBox {
       price: (json['price'] ?? 0).toDouble(),
       giftCount: json['gift_count'] ?? 3,
       isRandom: json['is_random'] ?? false,
+      scratchLimit: scratchLimit,
     );
   }
 
@@ -77,6 +88,7 @@ class MysteryBox {
       'price': price,
       'gift_count': giftCount,
       'is_random': isRandom,
+      'scratch_limit': scratchLimit,
     };
   }
 }
