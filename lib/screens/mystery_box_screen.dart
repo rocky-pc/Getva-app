@@ -22,8 +22,10 @@ class _MysteryBoxScreenState extends State<MysteryBoxScreen>
   int? _userId;
   double _userBalance = 0.0;
   bool _isPurchased = false;
-  int _scratchLimit = 5; // Total scratch limit available
+  int _scratchLimit = 0; // Total scratch limit available (calculated from purchases)
   int _usedScratches = 0; // Number of scratches used
+  int _purchaseCount = 0; // Number of times user purchased this box
+  int _perPurchaseLimit = 0; // Scratch limit per purchase (from admin panel)
 
   final Map<int, double> _giftRewards = {
     1: 10.0,
@@ -38,9 +40,6 @@ class _MysteryBoxScreenState extends State<MysteryBoxScreen>
   void initState() {
     super.initState();
     _loadUserId();
-
-    // Initialize scratch limit from box settings
-    _scratchLimit = widget.box.scratchLimit;
 
     _headerPulseCtrl = AnimationController(
       vsync: this,
@@ -57,9 +56,30 @@ class _MysteryBoxScreenState extends State<MysteryBoxScreen>
       setState(() => _userId = userId);
       if (userId != null) {
         await _loadUserBalance();
+        
+        // Get purchase count and scratch limit from admin panel
+        final purchaseCount = await ApiService.getBoxPurchaseCount(userId, widget.box.id);
+        final apiScratchLimit = await ApiService.getScratchCardLimit();
+        
+        // Use API limit if set by admin, otherwise use box setting
+        final perPurchaseLimit = apiScratchLimit > 0 ? apiScratchLimit : widget.box.scratchLimit;
+        
+        setState(() {
+          _purchaseCount = purchaseCount;
+          _perPurchaseLimit = perPurchaseLimit;
+          // Calculate total scratch limit based on purchase count
+          // If purchased once: 5 scratches, twice: 10 scratches, etc.
+          _scratchLimit = _purchaseCount * perPurchaseLimit;
+        });
+        
         await _loadScratchHistory();
-        bool alreadyPurchased = widget.box.price <= 0 || await ApiService.hasUserPurchasedBox(userId, widget.box.id);
-        if (!alreadyPurchased) _showPurchaseDialog(); else setState(() => _isPurchased = true);
+        
+        bool alreadyPurchased = widget.box.price <= 0 || purchaseCount > 0;
+        if (!alreadyPurchased) {
+          _showPurchaseDialog();
+        } else {
+          setState(() => _isPurchased = true);
+        }
       }
     }
   }
@@ -75,25 +95,20 @@ class _MysteryBoxScreenState extends State<MysteryBoxScreen>
   Future<void> _loadScratchHistory() async {
     if (_userId == null) return;
     try {
-      // First, try to get scratch limit from API settings
-      final apiScratchLimit = await ApiService.getScratchCardLimit();
-      
       final history = await ApiService.getScratchHistory(userId: _userId!, mysteryBoxId: widget.box.id);
       if (mounted) {
         setState(() {
-          // Use API scratch limit if available, otherwise use box setting
-          _scratchLimit = apiScratchLimit > 0 ? apiScratchLimit : widget.box.scratchLimit;
-          _usedScratches = history.length; // Track how many scratches have been used
+          // Track how many scratches have been used
+          _usedScratches = history.length;
           for (var item in history) {
             _revealedCards.add(item['card_position'] as int);
           }
         });
       }
     } catch (e) {
-      // On error, use box setting
+      // On error, use revealed cards count
       if (mounted) {
         setState(() {
-          _scratchLimit = widget.box.scratchLimit;
           _usedScratches = _revealedCards.length;
         });
       }
@@ -144,7 +159,9 @@ class _MysteryBoxScreenState extends State<MysteryBoxScreen>
                     const Icon(Icons.grid_4x4_rounded, color: Color(0xFF00BFA5), size: 20),
                     const SizedBox(width: 8),
                     Text(
-                      '${widget.box.scratchLimit} Scratch Attempts',
+                      _perPurchaseLimit > 0
+                          ? '$_perPurchaseLimit Scratches per Purchase (${_purchaseCount + 1} purchase${_purchaseCount > 0 ? 's' : ''})'
+                          : 'Scratch limit not set by admin',
                       style: const TextStyle(color: Color(0xFF00BFA5), fontSize: 14, fontWeight: FontWeight.bold),
                     ),
                   ],
@@ -185,17 +202,25 @@ class _MysteryBoxScreenState extends State<MysteryBoxScreen>
       final result = await ApiService.purchaseMysteryBox(userId: _userId!, boxId: widget.box.id, boxPrice: widget.box.price);
       if (result['success'] == true) {
         if (mounted) {
+          // Get updated purchase count and scratch limit from admin panel
+          final newPurchaseCount = await ApiService.getBoxPurchaseCount(_userId!, widget.box.id);
+          final apiScratchLimit = await ApiService.getScratchCardLimit();
+          final perPurchaseLimit = apiScratchLimit > 0 ? apiScratchLimit : widget.box.scratchLimit;
+          
           setState(() {
             _isPurchased = true;
-            // Extend scratch limit by box's scratch limit (e.g., +5 scratches)
-            _scratchLimit = _scratchLimit + widget.box.scratchLimit;
+            _purchaseCount = newPurchaseCount;
+            _perPurchaseLimit = perPurchaseLimit;
+            // Recalculate total scratch limit based on purchase count
+            // If purchased 2 times: 2 * 5 = 10 scratches total
+            _scratchLimit = _purchaseCount * perPurchaseLimit;
           });
           _loadUserBalance();
           
           // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Purchased successfully! +${widget.box.scratchLimit} scratches added'),
+              content: Text('Purchased successfully!'),
               backgroundColor: const Color(0xFF00BFA5),
             ),
           );
@@ -300,7 +325,9 @@ class _MysteryBoxScreenState extends State<MysteryBoxScreen>
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '₹${widget.box.price.toStringAsFixed(0)} + $_scratchLimit scratches',
+                      _perPurchaseLimit > 0
+                          ? '₹${widget.box.price.toStringAsFixed(0)} + $_perPurchaseLimit scratches'
+                          : 'Contact admin to set scratch limit',
                       style: const TextStyle(color: Color(0xFFD4A847), fontSize: 20, fontWeight: FontWeight.bold),
                     ),
                   ],

@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 import '../widgets/wallet_balance_card.dart';
 import '../widgets/recent_transactions.dart';
 import '../widgets/common_bottom_nav.dart';
+import 'upi_payment_screen.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  DESIGN TOKENS
@@ -578,42 +579,58 @@ class _WalletScreenState extends State<WalletScreen>
                 amount: amount,
                 onTap: () {
                   Navigator.pop(context);
-                  _showComingSoon('Deposit ₹$amount');
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => UpiPaymentScreen(initialAmount: amount.toDouble()),
+                    ),
+                  );
                 },
               );
             }).toList(),
           ),
           const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: _cardBg,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _border),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: _gold.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.edit_rounded,
-                      color: _gold, size: 18),
+          GestureDetector(
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const UpiPaymentScreen(),
                 ),
-                const SizedBox(width: 14),
-                const Text('Enter custom amount',
-                    style: TextStyle(
-                        color: _textPrimary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600)),
-                const Spacer(),
-                const Icon(Icons.chevron_right_rounded,
-                    color: _textMuted, size: 20),
-              ],
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: _cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _border),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: _gold.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.edit_rounded,
+                        color: _gold, size: 18),
+                  ),
+                  const SizedBox(width: 14),
+                  const Text('Enter custom amount',
+                      style: TextStyle(
+                          color: _textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600)),
+                  const Spacer(),
+                  const Icon(Icons.chevron_right_rounded,
+                      color: _textMuted, size: 20),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 28),

@@ -295,15 +295,17 @@ class ApiService {
     return [10, 50, 100, 500, 1000, 2000];
   }
 
-  // Get scratch card limit from settings
+  // Get scratch card limit from settings - MUST be set by admin panel
   static Future<int> getScratchCardLimit() async {
     final response = await http.get(Uri.parse('$baseUrl/settings.php'));
     final data = jsonDecode(response.body);
     if (data['success'] == true) {
-      return int.tryParse(data['scratch_card_limit']?.toString() ?? '5') ?? 5;
+      final limit = int.tryParse(data['scratch_card_limit']?.toString() ?? '0') ?? 0;
+      // If admin hasn't set the limit, return 0 (will be handled in screen)
+      return limit > 0 ? limit : 0;
     }
-    // Return default limit if API fails
-    return 5;
+    // Return 0 if API fails - admin must configure this
+    return 0;
   }
 
   // App Config APIs (banner, mystery boxes)
