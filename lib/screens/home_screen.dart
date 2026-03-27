@@ -13,6 +13,7 @@ import 'profile_screen.dart';
 import 'gold_screen.dart';
 import 'getva_coin_screen.dart';
 import 'share_market_screen.dart';
+import 'notifications_screen.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  DESIGN TOKENS
@@ -182,6 +183,15 @@ class _HomeScreenState extends State<HomeScreen>
     ).then((_) => _walletChipKey.currentState?.refreshBalance());
   }
 
+  void _onPlayTap() {
+    if (_mysteryBoxes.isEmpty) return;
+
+    // Find the mystery box with the minimum price
+    MysteryBox cheapestBox = _mysteryBoxes.reduce((curr, next) => curr.price < next.price ? curr : next);
+
+    _onBoxTap(cheapestBox);
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -313,7 +323,10 @@ class _HomeScreenState extends State<HomeScreen>
                   child: _AnimatedReveal(
                     animation: _entryAnim,
                     delay: 0.0,
-                    child: _GreetingBanner(pulseAnim: _pulseAnim),
+                    child: _GreetingBanner(
+                      pulseAnim: _pulseAnim,
+                      onPlayTap: _onPlayTap,
+                    ),
                   ),
                 ),
               ),
@@ -659,7 +672,13 @@ class _StatPill extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════
 class _GreetingBanner extends StatelessWidget {
   final Animation<double> pulseAnim;
-  const _GreetingBanner({Key? key, required this.pulseAnim}) : super(key: key);
+  final VoidCallback onPlayTap;
+
+  const _GreetingBanner({
+    Key? key,
+    required this.pulseAnim,
+    required this.onPlayTap,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -756,7 +775,7 @@ class _GreetingBanner extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 14),
-          _PulsePlayButton(),
+          _PulsePlayButton(onTap: onPlayTap),
         ],
       ),
     );
@@ -767,6 +786,9 @@ class _GreetingBanner extends StatelessWidget {
 //  PULSE PLAY BUTTON
 // ═══════════════════════════════════════════════════════════════
 class _PulsePlayButton extends StatefulWidget {
+  final VoidCallback onTap;
+  const _PulsePlayButton({Key? key, required this.onTap}) : super(key: key);
+
   @override
   State<_PulsePlayButton> createState() => _PulsePlayButtonState();
 }
@@ -801,6 +823,7 @@ class _PulsePlayButtonState extends State<_PulsePlayButton>
       child: GestureDetector(
         onTapDown: (_) => _ctrl.stop(),
         onTapUp: (_) => _ctrl.repeat(reverse: true),
+        onTap: widget.onTap,
         child: Stack(
           alignment: Alignment.center,
           children: [
@@ -1330,7 +1353,12 @@ class _NotifButtonState extends State<_NotifButton>
         child: child,
       ),
       child: GestureDetector(
-        onTap: () {},
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+          );
+        },
         child: ClipRRect(
           borderRadius: BorderRadius.circular(14),
           child: BackdropFilter(

@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'notifications_screen.dart';
 
 // ── Enhanced Design Tokens ─────────────────────────────────────
 const _gold        = Color(0xFFD4A847);
@@ -506,7 +507,12 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
             ),
             const SizedBox(width: 8),
             _EnhancedGlassButton(
-                onTap: () {},
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+                  );
+                },
                 child: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 20)
             ),
           ],
@@ -630,7 +636,7 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: SizedBox(
-        height: 50,
+        height: 60,
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           itemCount: _stocks.length,
@@ -1045,7 +1051,7 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             crossAxisCount: 2,
-            childAspectRatio: 2.4,
+            childAspectRatio: 2.1,
             mainAxisSpacing: 12,
             crossAxisSpacing: 12,
             children: [
@@ -1066,7 +1072,7 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
 
   Widget _buildEnhancedStatItem(String label, String value, [IconData? icon, Color? iconColor]) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [_cardBg, _cardBg2],
@@ -1086,16 +1092,22 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
                 Icon(icon, color: iconColor, size: 14),
                 const SizedBox(width: 6),
               ],
-              Text(
-                label,
-                style: const TextStyle(color: _textMuted, fontSize: 11, fontWeight: FontWeight.w600),
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(color: _textMuted, fontSize: 11, fontWeight: FontWeight.w600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800),
+            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w800),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

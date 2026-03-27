@@ -520,44 +520,14 @@ class ApiService {
     }
   }
 
-  // Get Getva Coin packages - with fallback defaults
+  // Get Getva Coin packages - DEPRECATED: Packages are no longer used
+  // Users can now buy any amount of coins based on exchange rate
   static Future<Map<String, dynamic>> getGetvaCoinPackages() async {
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/getva_coin.php?action=getva_coin_packages'),
-      );
-      final data = jsonDecode(response.body);
-      
-      if (data['success'] == true && data['data'] != null) {
-        return data;
-      }
-      
-      // Return default packages if none found
-      return {
-        'success': true,
-        'data': [
-          {'id': 1, 'coin_amount': 100, 'price_in_rupees': '50.00', 'is_active': '1'},
-          {'id': 2, 'coin_amount': 250, 'price_in_rupees': '100.00', 'is_active': '1'},
-          {'id': 3, 'coin_amount': 500, 'price_in_rupees': '180.00', 'is_active': '1'},
-          {'id': 4, 'coin_amount': 1000, 'price_in_rupees': '350.00', 'is_active': '1'},
-          {'id': 5, 'coin_amount': 2000, 'price_in_rupees': '650.00', 'is_active': '1'},
-          {'id': 6, 'coin_amount': 5000, 'price_in_rupees': '1500.00', 'is_active': '1'}
-        ]
-      };
-    } catch (e) {
-      // Return default packages on error
-      return {
-        'success': true,
-        'data': [
-          {'id': 1, 'coin_amount': 100, 'price_in_rupees': '50.00', 'is_active': '1'},
-          {'id': 2, 'coin_amount': 250, 'price_in_rupees': '100.00', 'is_active': '1'},
-          {'id': 3, 'coin_amount': 500, 'price_in_rupees': '180.00', 'is_active': '1'},
-          {'id': 4, 'coin_amount': 1000, 'price_in_rupees': '350.00', 'is_active': '1'},
-          {'id': 5, 'coin_amount': 2000, 'price_in_rupees': '650.00', 'is_active': '1'},
-          {'id': 6, 'coin_amount': 5000, 'price_in_rupees': '1500.00', 'is_active': '1'}
-        ]
-      };
-    }
+    // Return empty array for backward compatibility
+    return {
+      'success': true,
+      'data': []
+    };
   }
 
   // Get Getva Coin wallet balance - with fallback
@@ -619,11 +589,10 @@ class ApiService {
   }
 
   // Purchase Getva Coins
+  // Price is calculated based on exchange rate: price = coinAmount * exchangeRate
   static Future<Map<String, dynamic>> purchaseGetvaCoins({
     required int userId,
-    required int packageId,
     required int coinAmount,
-    required double price,
   }) async {
     try {
       final response = await http.post(
@@ -632,14 +601,35 @@ class ApiService {
         body: jsonEncode({
           'action': 'purchase_getva_coins',
           'user_id': userId,
-          'package_id': packageId,
           'coin_amount': coinAmount,
-          'price': price,
         }),
       );
       return jsonDecode(response.body);
     } catch (e) {
       return {'success': false, 'message': 'Failed to purchase coins: $e'};
+    }
+  }
+
+  // Submit Getva Coin purchase request via UPI
+  static Future<Map<String, dynamic>> submitGetvaCoinPurchase({
+    required int userId,
+    required int coinAmount,
+    required String utrNumber,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/getva_coin.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'action': 'submit_getva_coin_purchase',
+          'user_id': userId,
+          'coin_amount': coinAmount,
+          'utr_number': utrNumber,
+        }),
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to submit request: $e'};
     }
   }
 }

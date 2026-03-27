@@ -6,6 +6,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../models/getva_coin.dart';
 import '../services/api_service.dart';
 import '../services/session_manager.dart';
+import 'getva_coin_upi_payment_screen.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  DESIGN TOKENS - Enhanced Color Palette
@@ -43,12 +44,14 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
 
   // ── API State ────────────────────────────────────────────────
   GetvaCoinSettings? _settings;
-  List<GetvaCoinPackage> _packages = [];
   GetvaCoinWallet? _wallet;
   List<GetvaCoinTransaction> _transactions = [];
   bool _isLoading = true;
   String? _error;
-  int _selectedPackageIndex = -1;
+  
+  // ── Purchase State ──────────────────────────────────────────
+  final TextEditingController _coinAmountController = TextEditingController();
+  int _coinAmount = 0;
 
   // ── UI State ─────────────────────────────────────────────────
   String _selectedPeriod = '24H';
@@ -168,6 +171,7 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
     _shimmerCtrl.dispose();
     _chartAnimationCtrl.dispose();
     _glowCtrl.dispose();
+    _coinAmountController.dispose();
     super.dispose();
   }
 
@@ -189,17 +193,6 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
         }
       } catch (e) {
         print('Error loading settings: $e');
-      }
-
-      List<GetvaCoinPackage> packages = [];
-      try {
-        final packagesResponse = await ApiService.getGetvaCoinPackages();
-        if (packagesResponse != null && packagesResponse['success'] == true) {
-          final list = packagesResponse['data'] as List<dynamic>? ?? [];
-          packages = list.map((p) => GetvaCoinPackage.fromJson(p)).toList();
-        }
-      } catch (e) {
-        print('Error loading packages: $e');
       }
 
       GetvaCoinWallet? wallet;
@@ -234,7 +227,6 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
       if (mounted) {
         setState(() {
           _settings = settings;
-          _packages = packages;
           _wallet = wallet;
           _transactions = transactions;
           _isLoading = false;
@@ -252,12 +244,23 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
   }
 
   Future<void> _purchaseCoins() async {
-    if (_selectedPackageIndex < 0 || _selectedPackageIndex >= _packages.length) {
-      _showError('Please select a package');
+    if (_coinAmount <= 0) {
+      _showError('Please enter a valid coin amount');
       return;
     }
 
-    final package = _packages[_selectedPackageIndex];
+    final minPurchase = _settings?.minPurchase ?? 10;
+    final maxPurchase = _settings?.maxPurchase ?? 5000;
+
+    if (_coinAmount < minPurchase) {
+      _showError('Minimum purchase is $minPurchase coins');
+      return;
+    }
+
+    if (_coinAmount > maxPurchase) {
+      _showError('Maximum purchase is $maxPurchase coins');
+      return;
+    }
 
     try {
       final userId = await SessionManager.getUserId();
@@ -268,13 +271,13 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
 
       final response = await ApiService.purchaseGetvaCoins(
         userId: userId,
-        packageId: package.id,
-        coinAmount: package.coinAmount,
-        price: package.priceInRupees,
+        coinAmount: _coinAmount,
       );
 
       if (response != null && response['success'] == true) {
         _showSuccess('Coins purchased successfully!');
+        _coinAmountController.clear();
+        setState(() => _coinAmount = 0);
         _loadData();
       } else {
         _showError(response?['message'] ?? 'Purchase failed');
@@ -282,6 +285,40 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
     } catch (_) {
       _showError('Purchase failed. Please try again.');
     }
+  }
+
+  void _navigateToUpiPayment() {
+    if (_coinAmount <= 0) {
+      _showError('Please enter a valid coin amount');
+      return;
+    }
+
+    final minPurchase = _settings?.minPurchase ?? 10;
+    final maxPurchase = _settings?.maxPurchase ?? 5000;
+
+    if (_coinAmount < minPurchase) {
+      _showError('Minimum purchase is $minPurchase coins');
+      return;
+    }
+
+    if (_coinAmount > maxPurchase) {
+      _showError('Maximum purchase is $maxPurchase coins');
+      return;
+    }
+
+    final exchangeRate = _settings?.exchangeRate ?? 1.0;
+    final totalPrice = _coinAmount * exchangeRate;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => GetvaCoinUpiPaymentScreen(
+          coinAmount: _coinAmount,
+          totalPrice: totalPrice,
+          exchangeRate: exchangeRate,
+        ),
+      ),
+    );
   }
 
   void _showError(String message) {
@@ -1191,13 +1228,17 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                 ),
                 child: Icon(icon, color: color, size: 16),
               ),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: _textMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: _textMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
               ),
             ],
@@ -1386,6 +1427,15 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
   }
 
   Widget _buildEnhancedPackagesSection() {
+    final exchangeRate = _settings?.exchangeRate ?? 1.0;
+    final minPurchase = _settings?.minPurchase ?? 10;
+    final maxPurchase = _settings?.maxPurchase ?? 5000;
+    final totalPrice = _coinAmount * exchangeRate;
+    final bonus = _settings?.promotionActive == true &&
+        _coinAmount >= (_settings?.promotionMinPurchase ?? 0)
+        ? (_coinAmount * (_settings?.promotionBonus ?? 0) / 100).round()
+        : 0;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -1418,9 +1468,9 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                   color: _gold.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text(
-                  'BEST DEALS',
-                  style: TextStyle(
+                child: Text(
+                  '1 GVC = ₹${exchangeRate.toStringAsFixed(2)}',
+                  style: const TextStyle(
                     color: _gold,
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
@@ -1430,195 +1480,162 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
             ],
           ),
           const SizedBox(height: 16),
-          if (_packages.isEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: _cardBg,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: _border),
-              ),
-              child: const Text(
-                'No packages available',
-                style: TextStyle(color: _textMuted),
-                textAlign: TextAlign.center,
-              ),
-            )
-          else
-            ...List.generate(_packages.length, (index) {
-              final package = _packages[index];
-              final isSelected = _selectedPackageIndex == index;
-              final bonus = _settings?.promotionActive == true &&
-                  package.coinAmount >= (_settings?.promotionMinPurchase ?? 0)
-                  ? (package.coinAmount * (_settings?.promotionBonus ?? 0) / 100).round()
-                  : 0;
-
-              return GestureDetector(
-                onTap: () => setState(() => _selectedPackageIndex = index),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  margin: const EdgeInsets.only(bottom: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: _cardBg,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: _border),
+            ),
+            child: Column(
+              children: [
+                // Coin amount input
+                TextField(
+                  controller: _coinAmountController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  style: const TextStyle(
+                    color: _textPrimary,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Enter Coin Amount',
+                    labelStyle: const TextStyle(color: _textMuted),
+                    hintText: 'e.g., 100',
+                    hintStyle: TextStyle(color: _textMuted.withOpacity(0.5)),
+                    prefixIcon: const Text('🪙', style: TextStyle(fontSize: 24)),
+                    suffixText: 'GVC',
+                    suffixStyle: const TextStyle(color: _gold, fontWeight: FontWeight.w600),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: _border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: _border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: _gold, width: 2),
+                    ),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _coinAmount = int.tryParse(value) ?? 0;
+                    });
+                  },
+                ),
+                const SizedBox(height: 12),
+                // Min/Max hints
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Min: $minPurchase GVC',
+                      style: const TextStyle(color: _textMuted, fontSize: 11),
+                    ),
+                    Text(
+                      'Max: $maxPurchase GVC',
+                      style: const TextStyle(color: _textMuted, fontSize: 11),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                // Price calculation
+                Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    gradient: isSelected
-                        ? LinearGradient(
-                      colors: [
-                        _gold.withOpacity(0.15),
-                        _goldDeep.withOpacity(0.08),
-                        _cardBg,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    )
-                        : null,
-                    color: isSelected ? null : _cardBg,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isSelected ? _gold : _border,
-                      width: isSelected ? 2 : 1,
+                    gradient: LinearGradient(
+                      colors: [_gold.withOpacity(0.1), _goldDeep.withOpacity(0.05)],
                     ),
-                    boxShadow: isSelected
-                        ? [
-                      BoxShadow(
-                        color: _gold.withOpacity(0.2),
-                        blurRadius: 20,
-                        spreadRadius: 2,
-                        offset: const Offset(0, 5),
-                      )
-                    ]
-                        : null,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _gold.withOpacity(0.3)),
                   ),
-                  child: Row(
+                  child: Column(
                     children: [
-                      // Animated coin icon
-                      TweenAnimationBuilder(
-                        tween: Tween<double>(begin: 1, end: isSelected ? 1.1 : 1),
-                        duration: const Duration(milliseconds: 200),
-                        builder: (context, scale, child) {
-                          return Transform.scale(
-                            scale: scale,
-                            child: Container(
-                              width: 56,
-                              height: 56,
-                              decoration: BoxDecoration(
-                                gradient: isSelected
-                                    ? const LinearGradient(colors: [_goldDeep, _gold])
-                                    : LinearGradient(
-                                  colors: [_gold.withOpacity(0.3), _gold.withOpacity(0.1)],
-                                ),
-                                borderRadius: BorderRadius.circular(16),
-                                border: isSelected
-                                    ? Border.all(color: _gold.withOpacity(0.5), width: 1)
-                                    : null,
-                              ),
-                              child: Center(
-                                child: Text(
-                                  '🪙',
-                                  style: TextStyle(fontSize: isSelected ? 28 : 24),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 14),
-                      // Coin amount + bonus
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  '${package.coinAmount}',
-                                  style: TextStyle(
-                                    color: isSelected ? _gold : _textPrimary,
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                                const Text(
-                                  ' Coins',
-                                  style: TextStyle(
-                                    color: _textMuted,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (bonus > 0) ...[
-                              const SizedBox(height: 6),
-                              AnimatedContainer(
-                                duration: const Duration(milliseconds: 300),
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [_green, Color(0xFF2E7D32)],
-                                  ),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  '+$bonus BONUS',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      // Price
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
+                          const Text(
+                            'You Pay:',
+                            style: TextStyle(color: _textMuted, fontSize: 14),
+                          ),
                           Text(
-                            '₹${package.priceInRupees.toStringAsFixed(0)}',
-                            style: TextStyle(
-                              color: isSelected ? _gold : _textPrimary,
-                              fontSize: 20,
+                            '₹${totalPrice.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              color: _gold,
+                              fontSize: 24,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
-                          Text(
-                            '₹${package.ratePerCoin.toStringAsFixed(2)}/coin',
-                            style: const TextStyle(color: _textMuted, fontSize: 10),
-                          ),
                         ],
                       ),
-                      if (isSelected) ...[
-                        const SizedBox(width: 10),
-                        const Icon(Icons.check_circle_rounded, color: _gold, size: 22),
+                      if (bonus > 0) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Bonus Coins:',
+                              style: TextStyle(color: _green, fontSize: 14),
+                            ),
+                            Text(
+                              '+$bonus GVC',
+                              style: const TextStyle(
+                                color: _green,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Total Coins:',
+                              style: TextStyle(color: _textPrimary, fontSize: 14),
+                            ),
+                            Text(
+                              '${_coinAmount + bonus} GVC',
+                              style: const TextStyle(
+                                color: _textPrimary,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ],
                   ),
                 ),
-              );
-            }),
-
+              ],
+            ),
+          ),
           // Enhanced BUY button
-          if (_selectedPackageIndex >= 0)
+          if (_coinAmount > 0)
             Padding(
               padding: const EdgeInsets.only(top: 20),
-              child: GestureDetector(
-                onTap: _purchaseCoins,
-                child: AnimatedBuilder(
-                  animation: _pulseAnim,
-                  builder: (context, child) {
-                    return Container(
+              child: Column(
+                children: [
+                  // UPI Payment Button
+                  GestureDetector(
+                    onTap: () => _navigateToUpiPayment(),
+                    child: Container(
                       width: double.infinity,
                       height: 60,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [_goldDeep, _gold, _goldBright],
+                          colors: [_cyan, Color(0xFF0099CC)],
                         ),
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: _gold.withOpacity(0.4 + _pulseAnim.value * 0.2),
+                            color: _cyan.withOpacity(0.4),
                             blurRadius: 25,
                             spreadRadius: 2,
                             offset: const Offset(0, 8),
@@ -1626,19 +1643,65 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                         ],
                       ),
                       child: const Center(
-                        child: Text(
-                          'BUY NOW 🪙',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.5,
-                          ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.payment, color: Colors.white, size: 24),
+                            SizedBox(width: 10),
+                            Text(
+                              'PAY VIA UPI',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Direct Purchase Button (if wallet has sufficient balance)
+                  GestureDetector(
+                    onTap: _purchaseCoins,
+                    child: AnimatedBuilder(
+                      animation: _pulseAnim,
+                      builder: (context, child) {
+                        return Container(
+                          width: double.infinity,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [_goldDeep, _gold, _goldBright],
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _gold.withOpacity(0.4 + _pulseAnim.value * 0.2),
+                                blurRadius: 25,
+                                spreadRadius: 2,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Text(
+                              'BUY $_coinAmount COINS 🪙',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
         ],
