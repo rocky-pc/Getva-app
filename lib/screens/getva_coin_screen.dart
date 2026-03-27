@@ -11,23 +11,23 @@ import 'getva_coin_upi_payment_screen.dart';
 // ═══════════════════════════════════════════════════════════════
 //  DESIGN TOKENS - Enhanced Color Palette
 // ═══════════════════════════════════════════════════════════════
-const _gold        = Color(0xFFD4A847);
-const _goldBright  = Color(0xFFFFE066);
-const _goldDeep    = Color(0xFFB8892A);
-const _goldGlow    = Color(0xFFFFD966);
-const _surface     = Color(0xFF0A0910);
-const _cardBg      = Color(0xFF110F1E);
-const _cardBg2     = Color(0xFF16132A);
-const _indigo      = Color(0xFF6366F1);
-const _violet      = Color(0xFF8B5CF6);
+const _gold = Color(0xFFD4A847);
+const _goldBright = Color(0xFFFFE066);
+const _goldDeep = Color(0xFFB8892A);
+const _goldGlow = Color(0xFFFFD966);
+const _surface = Color(0xFF0A0910);
+const _cardBg = Color(0xFF110F1E);
+const _cardBg2 = Color(0xFF16132A);
+const _indigo = Color(0xFF6366F1);
+const _violet = Color(0xFF8B5CF6);
 const _violetLight = Color(0xFF8B6FE8);
-const _green       = Color(0xFF22C55E);
-const _cyan        = Color(0xFF00E5FF);
-const _rose        = Color(0xFFFF3D71);
-const _red         = Color(0xFFEF4444);
+const _green = Color(0xFF22C55E);
+const _cyan = Color(0xFF00E5FF);
+const _rose = Color(0xFFFF3D71);
+const _red = Color(0xFFEF4444);
 const _textPrimary = Colors.white;
-const _textMuted   = Color(0xFF6B6880);
-const _border      = Color(0xFF1E1B32);
+const _textMuted = Color(0xFF6B6880);
+const _border = Color(0xFF1E1B32);
 
 // ═══════════════════════════════════════════════════════════════
 //  GETVA COIN SCREEN - Enhanced Version
@@ -41,17 +41,17 @@ class GetvaCoinScreen extends StatefulWidget {
 
 class _GetvaCoinScreenState extends State<GetvaCoinScreen>
     with TickerProviderStateMixin {
-
   // ── API State ────────────────────────────────────────────────
   GetvaCoinSettings? _settings;
   GetvaCoinWallet? _wallet;
   List<GetvaCoinTransaction> _transactions = [];
   bool _isLoading = true;
   String? _error;
-  
+
   // ── Purchase State ──────────────────────────────────────────
   final TextEditingController _coinAmountController = TextEditingController();
   int _coinAmount = 0;
+  double _walletBalance = 0.0;
 
   // ── UI State ─────────────────────────────────────────────────
   String _selectedPeriod = '24H';
@@ -102,54 +102,79 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
     }
     _chartData = data;
 
-    _priceSpots = List.generate(data.length, (i) => FlSpot(i.toDouble(), data[i]));
-    _volumeSpots = List.generate(data.length, (i) => FlSpot(i.toDouble(), random.nextDouble() * 15 + 5));
+    _priceSpots = List.generate(
+      data.length,
+      (i) => FlSpot(i.toDouble(), data[i]),
+    );
+    _volumeSpots = List.generate(
+      data.length,
+      (i) => FlSpot(i.toDouble(), random.nextDouble() * 15 + 5),
+    );
   }
 
   void _initAnimations() {
     _shimmerCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 2800))
-      ..repeat();
-    _shimmerAnim = Tween<double>(begin: 0, end: 1)
-        .animate(CurvedAnimation(parent: _shimmerCtrl, curve: Curves.linear));
+      vsync: this,
+      duration: const Duration(milliseconds: 2800),
+    )..repeat();
+    _shimmerAnim = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _shimmerCtrl, curve: Curves.linear));
 
     _pulseCtrl = AnimationController(
-        vsync: this, duration: const Duration(seconds: 3))
-      ..repeat(reverse: true);
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..repeat(reverse: true);
     _pulseAnim = CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut);
 
     _orbCtrl = AnimationController(
-        vsync: this, duration: const Duration(seconds: 8))
-      ..repeat(reverse: true);
+      vsync: this,
+      duration: const Duration(seconds: 8),
+    )..repeat(reverse: true);
     _orbAnim = CurvedAnimation(parent: _orbCtrl, curve: Curves.easeInOut);
 
     _particleCtrl = AnimationController(
-        vsync: this, duration: const Duration(seconds: 14))
-      ..repeat();
+      vsync: this,
+      duration: const Duration(seconds: 14),
+    )..repeat();
 
     _entryCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1000));
-    _entryAnim = CurvedAnimation(parent: _entryCtrl, curve: Curves.easeOutCubic);
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+    _entryAnim = CurvedAnimation(
+      parent: _entryCtrl,
+      curve: Curves.easeOutCubic,
+    );
 
     _chartAnimationCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1200));
-    _chartAnim = CurvedAnimation(parent: _chartAnimationCtrl, curve: Curves.easeOutCubic);
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    _chartAnim = CurvedAnimation(
+      parent: _chartAnimationCtrl,
+      curve: Curves.easeOutCubic,
+    );
 
     _glowCtrl = AnimationController(
-        vsync: this, duration: const Duration(seconds: 2))
-      ..repeat(reverse: true);
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
     _glowAnim = CurvedAnimation(parent: _glowCtrl, curve: Curves.easeInOut);
 
     final rng = math.Random(99);
     for (int i = 0; i < 40; i++) {
-      _particles.add(_Particle(
-        x: rng.nextDouble(),
-        y: rng.nextDouble(),
-        radius: rng.nextDouble() * 2.0 + 0.5,
-        speed: rng.nextDouble() * 0.3 + 0.1,
-        opacity: rng.nextDouble() * 0.4 + 0.05,
-        phase: rng.nextDouble(),
-      ));
+      _particles.add(
+        _Particle(
+          x: rng.nextDouble(),
+          y: rng.nextDouble(),
+          radius: rng.nextDouble() * 2.0 + 0.5,
+          speed: rng.nextDouble() * 0.3 + 0.1,
+          opacity: rng.nextDouble() * 0.4 + 0.05,
+          phase: rng.nextDouble(),
+        ),
+      );
     }
 
     _animationsReady = true;
@@ -217,11 +242,20 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
           final txnResponse = await ApiService.getGetvaCoinTransactions(userId);
           if (txnResponse != null && txnResponse['success'] == true) {
             final txnList = txnResponse['data'] as List<dynamic>? ?? [];
-            transactions = txnList.map((t) => GetvaCoinTransaction.fromJson(t)).toList();
+            transactions = txnList
+                .map((t) => GetvaCoinTransaction.fromJson(t))
+                .toList();
           }
         }
       } catch (e) {
         print('Error loading transactions: $e');
+      }
+
+      double walletBalance = 0.0;
+      try {
+        walletBalance = await ApiService.getWalletBalance();
+      } catch (e) {
+        print('Error loading wallet balance: $e');
       }
 
       if (mounted) {
@@ -229,6 +263,7 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
           _settings = settings;
           _wallet = wallet;
           _transactions = transactions;
+          _walletBalance = walletBalance;
           _isLoading = false;
         });
       }
@@ -262,6 +297,73 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
       return;
     }
 
+    final exchangeRate = _settings?.exchangeRate ?? 1.0;
+    final totalPrice = _coinAmount * exchangeRate;
+
+    if (_walletBalance < totalPrice) {
+      _showError(
+        'Insufficient wallet balance. Required: ₹${totalPrice.toStringAsFixed(2)}',
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Confirm Purchase',
+          style: TextStyle(color: _textPrimary, fontWeight: FontWeight.w800),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Buy $_coinAmount GVC coins?',
+              style: const TextStyle(color: _textPrimary, fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Amount: ₹${totalPrice.toStringAsFixed(2)}',
+              style: const TextStyle(color: _gold, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Will be deducted from your wallet balance',
+              style: TextStyle(color: _textMuted, fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: _textMuted)),
+          ),
+          GestureDetector(
+            onTap: () => Navigator.pop(ctx, true),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [_goldDeep, _gold]),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'Confirm',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     try {
       final userId = await SessionManager.getUserId();
       if (userId == null) {
@@ -275,10 +377,10 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
       );
 
       if (response != null && response['success'] == true) {
-        _showSuccess('Coins purchased successfully!');
+        _showSuccess('Successfully purchased $_coinAmount GVC coins!');
         _coinAmountController.clear();
         setState(() => _coinAmount = 0);
-        _loadData();
+        await _loadData();
       } else {
         _showError(response?['message'] ?? 'Purchase failed');
       }
@@ -287,7 +389,7 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
     }
   }
 
-  void _navigateToUpiPayment() {
+  Future<void> _navigateToUpiPayment() async {
     if (_coinAmount <= 0) {
       _showError('Please enter a valid coin amount');
       return;
@@ -309,7 +411,7 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
     final exchangeRate = _settings?.exchangeRate ?? 1.0;
     final totalPrice = _coinAmount * exchangeRate;
 
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => GetvaCoinUpiPaymentScreen(
@@ -319,6 +421,11 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
         ),
       ),
     );
+
+    // Update wallet + coin data after returning from UPI payment flow
+    if (mounted) {
+      await _loadData();
+    }
   }
 
   void _showError(String message) {
@@ -390,7 +497,9 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                       top: -100 + _orbAnim.value * 60,
                       left: size.width / 2 - 250,
                       child: _EnhancedOrbGlow(
-                        color: _gold.withOpacity(0.12 + _pulseAnim.value * 0.08),
+                        color: _gold.withOpacity(
+                          0.12 + _pulseAnim.value * 0.08,
+                        ),
                         size: 480,
                         blurSigma: 80,
                       ),
@@ -471,9 +580,7 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                   width: 70,
                   height: 70,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [_gold, _goldDeep],
-                    ),
+                    gradient: const LinearGradient(colors: [_gold, _goldDeep]),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
@@ -529,9 +636,16 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                     decoration: BoxDecoration(
                       color: _rose.withOpacity(0.1),
                       shape: BoxShape.circle,
-                      border: Border.all(color: _rose.withOpacity(0.3), width: 2),
+                      border: Border.all(
+                        color: _rose.withOpacity(0.3),
+                        width: 2,
+                      ),
                     ),
-                    child: const Icon(Icons.error_outline, color: _rose, size: 48),
+                    child: const Icon(
+                      Icons.error_outline,
+                      color: _rose,
+                      size: 48,
+                    ),
                   ),
                 );
               },
@@ -546,15 +660,19 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
             GestureDetector(
               onTap: _loadData,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(colors: [_gold, _goldDeep]),
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
-                        color: _gold.withOpacity(0.3),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6))
+                      color: _gold.withOpacity(0.3),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
                   ],
                 ),
                 child: const Text(
@@ -606,42 +724,76 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
       color: _gold,
       backgroundColor: _cardBg,
       child: CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
         slivers: [
           _buildEnhancedAppBar(),
           const SliverToBoxAdapter(child: SizedBox(height: 16)),
           SliverToBoxAdapter(
-            child: _AnimatedReveal(animation: _entryAnim, delay: 0.0, child: _buildEnhancedHeroCard()),
+            child: _AnimatedReveal(
+              animation: _entryAnim,
+              delay: 0.0,
+              child: _buildEnhancedHeroCard(),
+            ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
           SliverToBoxAdapter(
-            child: _AnimatedReveal(animation: _entryAnim, delay: 0.1, child: _buildEnhancedPeriodSelector()),
+            child: _AnimatedReveal(
+              animation: _entryAnim,
+              delay: 0.1,
+              child: _buildEnhancedPeriodSelector(),
+            ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
           SliverToBoxAdapter(
-            child: _AnimatedReveal(animation: _entryAnim, delay: 0.2, child: _buildEnhancedChartSection()),
+            child: _AnimatedReveal(
+              animation: _entryAnim,
+              delay: 0.2,
+              child: _buildEnhancedChartSection(),
+            ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
           SliverToBoxAdapter(
-            child: _AnimatedReveal(animation: _entryAnim, delay: 0.25, child: _buildEnhancedStatsRow()),
+            child: _AnimatedReveal(
+              animation: _entryAnim,
+              delay: 0.25,
+              child: _buildEnhancedStatsRow(),
+            ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
           SliverToBoxAdapter(
-            child: _AnimatedReveal(animation: _entryAnim, delay: 0.3, child: _buildEnhancedExchangeRateCard()),
+            child: _AnimatedReveal(
+              animation: _entryAnim,
+              delay: 0.3,
+              child: _buildEnhancedExchangeRateCard(),
+            ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
           if (_settings?.promotionActive == true)
             SliverToBoxAdapter(
-              child: _AnimatedReveal(animation: _entryAnim, delay: 0.35, child: _buildEnhancedPromotionCard()),
+              child: _AnimatedReveal(
+                animation: _entryAnim,
+                delay: 0.35,
+                child: _buildEnhancedPromotionCard(),
+              ),
             ),
           if (_settings?.promotionActive == true)
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           SliverToBoxAdapter(
-            child: _AnimatedReveal(animation: _entryAnim, delay: 0.4, child: _buildEnhancedPackagesSection()),
+            child: _AnimatedReveal(
+              animation: _entryAnim,
+              delay: 0.4,
+              child: _buildEnhancedPackagesSection(),
+            ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
           SliverToBoxAdapter(
-            child: _AnimatedReveal(animation: _entryAnim, delay: 0.5, child: _buildEnhancedTransactionsSection()),
+            child: _AnimatedReveal(
+              animation: _entryAnim,
+              delay: 0.5,
+              child: _buildEnhancedTransactionsSection(),
+            ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 50)),
         ],
@@ -662,7 +814,11 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
           children: [
             _EnhancedGlassButton(
               onTap: () => Navigator.pop(context),
-              child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+              child: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
             ),
             const SizedBox(width: 16),
             Column(
@@ -680,24 +836,33 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(colors: [_gold, _goldDeep]),
+                        gradient: const LinearGradient(
+                          colors: [_gold, _goldDeep],
+                        ),
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: const Text('GVC',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800)),
+                      child: const Text(
+                        'GVC',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Text(
                       'Balance: ${balance.toStringAsFixed(2)}',
                       style: const TextStyle(
-                          color: _textMuted,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600),
+                        color: _textMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
@@ -706,7 +871,11 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
             const Spacer(),
             _EnhancedGlassButton(
               onTap: () {},
-              child: const Icon(Icons.history_rounded, color: Colors.white, size: 20),
+              child: const Icon(
+                Icons.history_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
           ],
         ),
@@ -782,16 +951,20 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                               child: Text(
                                 'GVC',
                                 style: TextStyle(
-                                    color: _textMuted,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500),
+                                  color: _textMuted,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 4),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: _gold.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(8),
@@ -847,7 +1020,10 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                     ),
                     const SizedBox(width: 12),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: _green.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
@@ -914,34 +1090,43 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: periods.map((p) => Expanded(
-            child: GestureDetector(
-              onTap: () {
-                setState(() => _selectedPeriod = p);
-                _updateChartDataForPeriod(p);
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                decoration: BoxDecoration(
-                  gradient: _selectedPeriod == p
-                      ? const LinearGradient(colors: [_goldDeep, _gold])
-                      : null,
-                  color: _selectedPeriod == p ? null : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  p,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: _selectedPeriod == p ? Colors.white : _textMuted,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 12,
+          children: periods
+              .map(
+                (p) => Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() => _selectedPeriod = p);
+                      _updateChartDataForPeriod(p);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: _selectedPeriod == p
+                            ? const LinearGradient(colors: [_goldDeep, _gold])
+                            : null,
+                        color: _selectedPeriod == p ? null : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        p,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: _selectedPeriod == p
+                              ? Colors.white
+                              : _textMuted,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-          )).toList(),
+              )
+              .toList(),
         ),
       ),
     );
@@ -951,16 +1136,28 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
     // Simulate chart data update based on period
     final random = math.Random(42);
     double price = 38.5;
-    int points = period == '1H' ? 24 : period == '24H' ? 30 : period == '1W' ? 50 : period == '1M' ? 60 : 100;
+    int points = period == '1H'
+        ? 24
+        : period == '24H'
+        ? 30
+        : period == '1W'
+        ? 50
+        : period == '1M'
+        ? 60
+        : 100;
     List<double> data = [];
     for (int i = 0; i < points; i++) {
-      double change = (random.nextDouble() - 0.5) * (period == '1Y' ? 3.0 : 2.0);
+      double change =
+          (random.nextDouble() - 0.5) * (period == '1Y' ? 3.0 : 2.0);
       price = (price + change).clamp(35.0, 48.0);
       data.add(price);
     }
     setState(() {
       _chartData = data;
-      _priceSpots = List.generate(data.length, (i) => FlSpot(i.toDouble(), data[i]));
+      _priceSpots = List.generate(
+        data.length,
+        (i) => FlSpot(i.toDouble(), data[i]),
+      );
     });
     _chartAnimationCtrl.reset();
     _chartAnimationCtrl.forward();
@@ -997,7 +1194,10 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: _gold.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(8),
@@ -1041,7 +1241,8 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                                 reservedSize: 25,
                                 getTitlesWidget: (value, meta) {
                                   int index = value.toInt();
-                                  if (index % 5 == 0 && index < _chartData.length) {
+                                  if (index % 5 == 0 &&
+                                      index < _chartData.length) {
                                     return Padding(
                                       padding: const EdgeInsets.only(top: 8),
                                       child: Text(
@@ -1072,13 +1273,24 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                                 },
                               ),
                             ),
-                            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                            topTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                            rightTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
                           ),
                           borderData: FlBorderData(show: false),
                           lineBarsData: [
                             LineChartBarData(
-                              spots: _priceSpots.map((spot) => FlSpot(spot.x, spot.y * _chartAnim.value)).toList(),
+                              spots: _priceSpots
+                                  .map(
+                                    (spot) => FlSpot(
+                                      spot.x,
+                                      spot.y * _chartAnim.value,
+                                    ),
+                                  )
+                                  .toList(),
                               isCurved: true,
                               gradient: const LinearGradient(
                                 colors: [_goldDeep, _gold, _goldBright],
@@ -1103,15 +1315,23 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                           lineTouchData: LineTouchData(
                             touchTooltipData: LineTouchTooltipData(
                               tooltipRoundedRadius: 12,
-                              tooltipBorder: BorderSide(color: _gold.withOpacity(0.5), width: 1),
-                              getTooltipItems: (List<LineBarSpot> touchedSpots) {
-                                return touchedSpots.map((spot) {
-                                  return LineTooltipItem(
-                                    '₹${spot.y.toStringAsFixed(2)}',
-                                    const TextStyle(color: _gold, fontWeight: FontWeight.bold, fontSize: 12),
-                                  );
-                                }).toList();
-                              },
+                              tooltipBorder: BorderSide(
+                                color: _gold.withOpacity(0.5),
+                                width: 1,
+                              ),
+                              getTooltipItems:
+                                  (List<LineBarSpot> touchedSpots) {
+                                    return touchedSpots.map((spot) {
+                                      return LineTooltipItem(
+                                        '₹${spot.y.toStringAsFixed(2)}',
+                                        const TextStyle(
+                                          color: _gold,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      );
+                                    }).toList();
+                                  },
                             ),
                           ),
                         ),
@@ -1130,7 +1350,9 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                                 shape: BoxShape.circle,
                                 gradient: RadialGradient(
                                   colors: [
-                                    _gold.withOpacity(0.3 + _glowAnim.value * 0.2),
+                                    _gold.withOpacity(
+                                      0.3 + _glowAnim.value * 0.2,
+                                    ),
                                     Colors.transparent,
                                   ],
                                 ),
@@ -1188,22 +1410,42 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
       child: Row(
         children: [
           Expanded(
-            child: _buildEnhancedStatCard('Exchange Rate', '₹${rate.toStringAsFixed(2)}', Icons.currency_exchange, _cyan),
+            child: _buildEnhancedStatCard(
+              'Exchange Rate',
+              '₹${rate.toStringAsFixed(2)}',
+              Icons.currency_exchange,
+              _cyan,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: _buildEnhancedStatCard('24h Volume', '₹${(volume / 1000000).toStringAsFixed(1)}M', Icons.trending_up, _green),
+            child: _buildEnhancedStatCard(
+              '24h Volume',
+              '₹${(volume / 1000000).toStringAsFixed(1)}M',
+              Icons.trending_up,
+              _green,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: _buildEnhancedStatCard('Market Cap', '₹${(marketCap / 1000000).toStringAsFixed(0)}M', Icons.show_chart, _gold),
+            child: _buildEnhancedStatCard(
+              'Market Cap',
+              '₹${(marketCap / 1000000).toStringAsFixed(0)}M',
+              Icons.show_chart,
+              _gold,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildEnhancedStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildEnhancedStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1269,10 +1511,7 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [
-                  _cardBg,
-                  _cardBg2,
-                ],
+                colors: [_cardBg, _cardBg2],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -1292,7 +1531,11 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                     ),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: const Icon(Icons.currency_exchange, color: Colors.white, size: 26),
+                  child: const Icon(
+                    Icons.currency_exchange,
+                    color: Colors.white,
+                    size: 26,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -1333,7 +1576,11 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                     color: _green.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.arrow_upward, color: _green, size: 16),
+                  child: const Icon(
+                    Icons.arrow_upward,
+                    color: _green,
+                    size: 16,
+                  ),
                 ),
               ],
             ),
@@ -1389,7 +1636,11 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                       ),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: const Icon(Icons.celebration, color: Colors.white, size: 26),
+                    child: const Icon(
+                      Icons.celebration,
+                      color: Colors.white,
+                      size: 26,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -1431,8 +1682,9 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
     final minPurchase = _settings?.minPurchase ?? 10;
     final maxPurchase = _settings?.maxPurchase ?? 5000;
     final totalPrice = _coinAmount * exchangeRate;
-    final bonus = _settings?.promotionActive == true &&
-        _coinAmount >= (_settings?.promotionMinPurchase ?? 0)
+    final bonus =
+        _settings?.promotionActive == true &&
+            _coinAmount >= (_settings?.promotionMinPurchase ?? 0)
         ? (_coinAmount * (_settings?.promotionBonus ?? 0) / 100).round()
         : 0;
 
@@ -1505,9 +1757,15 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                     labelStyle: const TextStyle(color: _textMuted),
                     hintText: 'e.g., 100',
                     hintStyle: TextStyle(color: _textMuted.withOpacity(0.5)),
-                    prefixIcon: const Text('🪙', style: TextStyle(fontSize: 24)),
+                    prefixIcon: const Text(
+                      '🪙',
+                      style: TextStyle(fontSize: 24),
+                    ),
                     suffixText: 'GVC',
-                    suffixStyle: const TextStyle(color: _gold, fontWeight: FontWeight.w600),
+                    suffixStyle: const TextStyle(
+                      color: _gold,
+                      fontWeight: FontWeight.w600,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
                       borderSide: const BorderSide(color: _border),
@@ -1548,7 +1806,10 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [_gold.withOpacity(0.1), _goldDeep.withOpacity(0.05)],
+                      colors: [
+                        _gold.withOpacity(0.1),
+                        _goldDeep.withOpacity(0.05),
+                      ],
                     ),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: _gold.withOpacity(0.3)),
@@ -1597,7 +1858,10 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                           children: [
                             const Text(
                               'Total Coins:',
-                              style: TextStyle(color: _textPrimary, fontSize: 14),
+                              style: TextStyle(
+                                color: _textPrimary,
+                                fontSize: 14,
+                              ),
                             ),
                             Text(
                               '${_coinAmount + bonus} GVC',
@@ -1663,37 +1927,101 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // Direct Purchase Button (if wallet has sufficient balance)
+                  // Wallet Balance Display
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _cardBg,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: _border),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Wallet Balance:',
+                          style: TextStyle(
+                            color: _textMuted,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          '₹${_walletBalance.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            color: _walletBalance >= totalPrice
+                                ? _green
+                                : _rose,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Direct Purchase Button (from wallet balance)
                   GestureDetector(
-                    onTap: _purchaseCoins,
+                    onTap: _walletBalance >= totalPrice ? _purchaseCoins : null,
                     child: AnimatedBuilder(
                       animation: _pulseAnim,
                       builder: (context, child) {
-                        return Container(
-                          width: double.infinity,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [_goldDeep, _gold, _goldBright],
+                        final canAfford = _walletBalance >= totalPrice;
+                        return Opacity(
+                          opacity: canAfford ? 1.0 : 0.5,
+                          child: Container(
+                            width: double.infinity,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              gradient: canAfford
+                                  ? const LinearGradient(
+                                      colors: [_goldDeep, _gold, _goldBright],
+                                    )
+                                  : null,
+                              color: canAfford
+                                  ? null
+                                  : _textMuted.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: canAfford
+                                  ? [
+                                      BoxShadow(
+                                        color: _gold.withOpacity(
+                                          0.4 + _pulseAnim.value * 0.2,
+                                        ),
+                                        blurRadius: 25,
+                                        spreadRadius: 2,
+                                        offset: const Offset(0, 8),
+                                      ),
+                                    ]
+                                  : [],
                             ),
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: _gold.withOpacity(0.4 + _pulseAnim.value * 0.2),
-                                blurRadius: 25,
-                                spreadRadius: 2,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: Center(
-                            child: Text(
-                              'BUY $_coinAmount COINS 🪙',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1.5,
+                            child: Center(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    canAfford
+                                        ? Icons.account_balance_wallet_rounded
+                                        : Icons.warning_rounded,
+                                    color: canAfford ? Colors.white : _rose,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    canAfford
+                                        ? 'BUY $_coinAmount COINS FROM WALLET'
+                                        : 'INSUFFICIENT WALLET BALANCE',
+                                    style: TextStyle(
+                                      color: canAfford ? Colors.white : _rose,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 1.2,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -1749,8 +2077,11 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
               ),
               child: Column(
                 children: [
-                  Icon(Icons.receipt_long_rounded,
-                      color: _textMuted.withOpacity(0.5), size: 48),
+                  Icon(
+                    Icons.receipt_long_rounded,
+                    color: _textMuted.withOpacity(0.5),
+                    size: 48,
+                  ),
                   const SizedBox(height: 12),
                   const Text(
                     'No transactions yet',
@@ -1759,7 +2090,10 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                   const SizedBox(height: 8),
                   Text(
                     'Your first purchase will appear here',
-                    style: TextStyle(color: _textMuted.withOpacity(0.7), fontSize: 12),
+                    style: TextStyle(
+                      color: _textMuted.withOpacity(0.7),
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
@@ -1771,7 +2105,8 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
               itemCount: _transactions.length > 8 ? 8 : _transactions.length,
               itemBuilder: (context, index) {
                 final txn = _transactions[index];
-                final isPositive = txn.transactionType == 'purchase' ||
+                final isPositive =
+                    txn.transactionType == 'purchase' ||
                     txn.transactionType == 'reward';
                 final color = isPositive ? _green : _rose;
 
@@ -1827,12 +2162,16 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                                       txn.description ??
                                           '${txn.amount.toStringAsFixed(0)} coins',
                                       style: const TextStyle(
-                                          color: _textMuted, fontSize: 11),
+                                        color: _textMuted,
+                                        fontSize: 11,
+                                      ),
                                     ),
                                     Text(
                                       _formatDate(txn.createdAt),
                                       style: const TextStyle(
-                                          color: _textMuted, fontSize: 9),
+                                        color: _textMuted,
+                                        fontSize: 9,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -1972,7 +2311,9 @@ class _EnhancedParticlePainter extends CustomPainter {
 
       // Create gradient for each particle
       final gradientColor = (i % 3 != 0 ? _gold : _goldBright);
-      paint.color = gradientColor.withOpacity(p.opacity * (0.5 + math.sin(progress * math.pi * 2) * 0.3));
+      paint.color = gradientColor.withOpacity(
+        p.opacity * (0.5 + math.sin(progress * math.pi * 2) * 0.3),
+      );
 
       canvas.drawCircle(
         Offset(x * size.width, y * size.height),

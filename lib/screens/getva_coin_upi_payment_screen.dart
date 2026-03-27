@@ -39,7 +39,8 @@ class GetvaCoinUpiPaymentScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<GetvaCoinUpiPaymentScreen> createState() => _GetvaCoinUpiPaymentScreenState();
+  State<GetvaCoinUpiPaymentScreen> createState() =>
+      _GetvaCoinUpiPaymentScreenState();
 }
 
 class _GetvaCoinUpiPaymentScreenState extends State<GetvaCoinUpiPaymentScreen> {
@@ -111,8 +112,8 @@ class _GetvaCoinUpiPaymentScreenState extends State<GetvaCoinUpiPaymentScreen> {
               child: CircularProgressIndicator(color: _gold, strokeWidth: 2.5),
             )
           : _upiEnabled && _upiId.isNotEmpty
-              ? _buildContent()
-              : _buildUpiDisabled(),
+          ? _buildContent()
+          : _buildUpiDisabled(),
     );
   }
 
@@ -280,15 +281,24 @@ class _GetvaCoinUpiPaymentScreenState extends State<GetvaCoinUpiPaymentScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          _buildStep('1', 'Open any UPI app (Google Pay, PhonePe, Paytm, etc.)'),
+          _buildStep(
+            '1',
+            'Open any UPI app (Google Pay, PhonePe, Paytm, etc.)',
+          ),
           const SizedBox(height: 8),
-          _buildStep('2', 'Send ₹${widget.totalPrice.toStringAsFixed(2)} to $_upiId'),
+          _buildStep(
+            '2',
+            'Send ₹${widget.totalPrice.toStringAsFixed(2)} to $_upiId',
+          ),
           const SizedBox(height: 8),
           _buildStep('3', 'Enter the UTR/Transaction number below'),
           const SizedBox(height: 8),
           _buildStep('4', 'Wait for admin verification (up to 24 hours)'),
           const SizedBox(height: 8),
-          _buildStep('5', 'Once verified, ${widget.coinAmount} GVC will be added to your wallet'),
+          _buildStep(
+            '5',
+            'Once verified, ${widget.coinAmount} GVC will be added to your wallet',
+          ),
         ],
       ),
     );
@@ -350,7 +360,11 @@ class _GetvaCoinUpiPaymentScreenState extends State<GetvaCoinUpiPaymentScreen> {
                   color: _gold.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.account_balance_wallet, color: _gold, size: 24),
+                child: const Icon(
+                  Icons.account_balance_wallet,
+                  color: _gold,
+                  size: 24,
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -375,7 +389,11 @@ class _GetvaCoinUpiPaymentScreenState extends State<GetvaCoinUpiPaymentScreen> {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.copy_rounded, color: _textMuted, size: 20),
+                icon: const Icon(
+                  Icons.copy_rounded,
+                  color: _textMuted,
+                  size: 20,
+                ),
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: _upiId));
                   HapticFeedback.selectionClick();
@@ -433,10 +451,7 @@ class _GetvaCoinUpiPaymentScreenState extends State<GetvaCoinUpiPaymentScreen> {
         const SizedBox(height: 8),
         TextField(
           controller: _utrController,
-          style: const TextStyle(
-            color: _textPrimary,
-            fontSize: 16,
-          ),
+          style: const TextStyle(color: _textPrimary, fontSize: 16),
           decoration: InputDecoration(
             hintText: 'Enter UTR number from your payment app',
             hintStyle: TextStyle(color: _textMuted.withOpacity(0.5)),
@@ -454,7 +469,10 @@ class _GetvaCoinUpiPaymentScreenState extends State<GetvaCoinUpiPaymentScreen> {
               borderRadius: BorderRadius.circular(16),
               borderSide: const BorderSide(color: _gold, width: 2),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 16,
+            ),
           ),
         ),
         const SizedBox(height: 8),
@@ -473,9 +491,7 @@ class _GetvaCoinUpiPaymentScreenState extends State<GetvaCoinUpiPaymentScreen> {
         backgroundColor: _gold,
         foregroundColor: _surface,
         padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         elevation: 0,
       ),
       child: _isSubmitting
@@ -489,10 +505,7 @@ class _GetvaCoinUpiPaymentScreenState extends State<GetvaCoinUpiPaymentScreen> {
             )
           : const Text(
               'Submit for Verification',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
     );
   }
@@ -518,6 +531,7 @@ class _GetvaCoinUpiPaymentScreenState extends State<GetvaCoinUpiPaymentScreen> {
         userId: userId,
         coinAmount: widget.coinAmount,
         utrNumber: utrNumber,
+        upiId: _upiId,
       );
 
       if (response['success'] == true) {

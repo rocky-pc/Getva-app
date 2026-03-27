@@ -13,19 +13,25 @@ class ApiService {
   static void setBaseUrl(String url) => baseUrl = url;
   static void resetBaseUrl() => baseUrl = 'https://getva.in/api';
 
-  static Future<Map<String, dynamic>> updateGoldRates(List<GoldRate> rates) async {
+  static Future<Map<String, dynamic>> updateGoldRates(
+    List<GoldRate> rates,
+  ) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/gold_rates.php'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: {
           'action': 'update_rates',
-          'rates': jsonEncode(rates
-              .map((rate) => {
+          'rates': jsonEncode(
+            rates
+                .map(
+                  (rate) => {
                     'gold_type': rate.goldType,
                     'rate_per_gram': rate.ratePerGram,
-                  })
-              .toList()),
+                  },
+                )
+                .toList(),
+          ),
         },
       );
       return jsonDecode(response.body);
@@ -35,7 +41,10 @@ class ApiService {
   }
 
   // User APIs
-  static Future<Map<String, dynamic>> login(String emailOrPhone, String password) async {
+  static Future<Map<String, dynamic>> login(
+    String emailOrPhone,
+    String password,
+  ) async {
     final response = await http.post(
       Uri.parse('$baseUrl/users.php'),
       headers: {'Content-Type': 'application/json'},
@@ -48,7 +57,9 @@ class ApiService {
     return jsonDecode(response.body);
   }
 
-  static Future<Map<String, dynamic>> registerUser(Map<String, dynamic> userData) async {
+  static Future<Map<String, dynamic>> registerUser(
+    Map<String, dynamic> userData,
+  ) async {
     final response = await http.post(
       Uri.parse('$baseUrl/users.php'),
       headers: {'Content-Type': 'application/json'},
@@ -62,7 +73,10 @@ class ApiService {
     return jsonDecode(response.body);
   }
 
-  static Future<Map<String, dynamic>> updateWallet(int userId, double balance) async {
+  static Future<Map<String, dynamic>> updateWallet(
+    int userId,
+    double balance,
+  ) async {
     final response = await http.put(
       Uri.parse('$baseUrl/users.php?id=$userId'),
       headers: {'Content-Type': 'application/json'},
@@ -98,17 +112,16 @@ class ApiService {
     } catch (e) {
       // If parsing fails, return a map that will trigger error handling
       print('purchaseMysteryBox exception: $e');
-      return {
-        'success': false,
-        'error': 'Failed to parse response: $e'
-      };
+      return {'success': false, 'error': 'Failed to parse response: $e'};
     }
   }
 
   // Get user wallet balance
   static Future<double> getUserWalletBalance(int userId) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/users.php?id=$userId'));
+      final response = await http.get(
+        Uri.parse('$baseUrl/users.php?id=$userId'),
+      );
       final data = jsonDecode(response.body);
       return double.tryParse(data['wallet_balance']?.toString() ?? '0') ?? 0.0;
     } catch (e) {
@@ -120,7 +133,9 @@ class ApiService {
   static Future<bool> hasUserPurchasedBox(int userId, int boxId) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/transactions.php?user_id=$userId&box_id=$boxId&type=purchase'),
+        Uri.parse(
+          '$baseUrl/transactions.php?user_id=$userId&box_id=$boxId&type=purchase',
+        ),
       );
 
       // Debug: print response status and body
@@ -153,7 +168,9 @@ class ApiService {
   static Future<int> getBoxPurchaseCount(int userId, int boxId) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/transactions.php?user_id=$userId&box_id=$boxId&type=purchase'),
+        Uri.parse(
+          '$baseUrl/transactions.php?user_id=$userId&box_id=$boxId&type=purchase',
+        ),
       );
 
       if (response.statusCode == 200) {
@@ -169,7 +186,12 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> updateUserCredentials(int userId, {String? email, String? phone, String? password}) async {
+  static Future<Map<String, dynamic>> updateUserCredentials(
+    int userId, {
+    String? email,
+    String? phone,
+    String? password,
+  }) async {
     final Map<String, dynamic> data = {};
     if (email != null) data['email'] = email;
     if (phone != null) data['phone'] = phone;
@@ -190,7 +212,9 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> getScratchCard(int cardId) async {
-    final response = await http.get(Uri.parse('$baseUrl/scratch_cards.php?id=$cardId'));
+    final response = await http.get(
+      Uri.parse('$baseUrl/scratch_cards.php?id=$cardId'),
+    );
     return jsonDecode(response.body);
   }
 
@@ -239,8 +263,16 @@ class ApiService {
   }
 
   // Transaction APIs
-  static Future<List<dynamic>> getUserTransactions(int userId, {int limit = 50, int offset = 0}) async {
-    final response = await http.get(Uri.parse('$baseUrl/transactions.php?user_id=$userId&limit=$limit&offset=$offset'));
+  static Future<List<dynamic>> getUserTransactions(
+    int userId, {
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final response = await http.get(
+      Uri.parse(
+        '$baseUrl/transactions.php?user_id=$userId&limit=$limit&offset=$offset',
+      ),
+    );
     return jsonDecode(response.body);
   }
 
@@ -251,7 +283,12 @@ class ApiService {
   }
 
   // Update user profile (name, email, phone)
-  static Future<Map<String, dynamic>> updateUserProfile(int userId, {String? name, String? email, String? phone}) async {
+  static Future<Map<String, dynamic>> updateUserProfile(
+    int userId, {
+    String? name,
+    String? email,
+    String? phone,
+  }) async {
     final Map<String, dynamic> data = {};
     if (name != null) data['name'] = name;
     if (email != null) data['email'] = email;
@@ -266,7 +303,10 @@ class ApiService {
   }
 
   // Update user password
-  static Future<Map<String, dynamic>> updateUserPassword(int userId, String newPassword) async {
+  static Future<Map<String, dynamic>> updateUserPassword(
+    int userId,
+    String newPassword,
+  ) async {
     final response = await http.put(
       Uri.parse('$baseUrl/users.php?id=$userId'),
       headers: {'Content-Type': 'application/json'},
@@ -275,7 +315,9 @@ class ApiService {
     return jsonDecode(response.body);
   }
 
-  static Future<Map<String, dynamic>> createTransaction(Map<String, dynamic> transactionData) async {
+  static Future<Map<String, dynamic>> createTransaction(
+    Map<String, dynamic> transactionData,
+  ) async {
     final response = await http.post(
       Uri.parse('$baseUrl/transactions.php'),
       headers: {'Content-Type': 'application/json'},
@@ -300,7 +342,8 @@ class ApiService {
     final response = await http.get(Uri.parse('$baseUrl/settings.php'));
     final data = jsonDecode(response.body);
     if (data['success'] == true) {
-      final limit = int.tryParse(data['scratch_card_limit']?.toString() ?? '0') ?? 0;
+      final limit =
+          int.tryParse(data['scratch_card_limit']?.toString() ?? '0') ?? 0;
       // If admin hasn't set the limit, return 0 (will be handled in screen)
       return limit > 0 ? limit : 0;
     }
@@ -314,13 +357,17 @@ class ApiService {
     final data = jsonDecode(response.body);
     if (data['success'] == true) {
       return {
-        'banner_image': data['banner_image'] ?? 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800',
+        'banner_image':
+            data['banner_image'] ??
+            'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800',
         'mystery_boxes': data['mystery_boxes'] ?? [],
-        'scratch_card_limit': int.tryParse(data['scratch_card_limit']?.toString() ?? '5') ?? 5,
+        'scratch_card_limit':
+            int.tryParse(data['scratch_card_limit']?.toString() ?? '5') ?? 5,
       };
     }
     return {
-      'banner_image': 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800',
+      'banner_image':
+          'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800',
       'mystery_boxes': [],
       'scratch_card_limit': 5,
     };
@@ -351,7 +398,9 @@ class ApiService {
   }) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/gold_rates.php?action=history&gold_type=$goldType&period=$period'),
+        Uri.parse(
+          '$baseUrl/gold_rates.php?action=history&gold_type=$goldType&period=$period',
+        ),
       );
       final data = jsonDecode(response.body);
       if (data['success'] == true) {
@@ -378,10 +427,10 @@ class ApiService {
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: {
           'action': 'purchase',
-          'user_id': userId,
+          'user_id': userId.toString(),
           'gold_type': goldType,
-          'grams': grams,
-          'amount': amount,
+          'grams': grams.toString(),
+          'amount': amount.toString(),
         },
       );
       return jsonDecode(response.body);
@@ -412,7 +461,9 @@ class ApiService {
   static Future<List<GoldPurchase>> getUserGoldPurchases(int userId) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/gold_rates.php?action=purchase_history&user_id=$userId'),
+        Uri.parse(
+          '$baseUrl/gold_rates.php?action=purchase_history&user_id=$userId',
+        ),
       );
       final data = jsonDecode(response.body);
       if (data['success'] == true) {
@@ -430,7 +481,9 @@ class ApiService {
   static Future<double> getWalletBalance() async {
     final userId = await SessionManager.getUserId();
     if (userId == null) throw Exception('User not logged in');
-    final response = await http.get(Uri.parse('$baseUrl/wallet_balance.php?user_id=$userId'));
+    final response = await http.get(
+      Uri.parse('$baseUrl/wallet_balance.php?user_id=$userId'),
+    );
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       // Check if the response was successful before returning the balance
@@ -447,7 +500,9 @@ class ApiService {
   static Future<double> getGoldWalletBalance() async {
     final userId = await SessionManager.getUserId();
     if (userId == null) throw Exception('User not logged in');
-    final response = await http.get(Uri.parse('$baseUrl/gold_wallet_balance.php?user_id=$userId'));
+    final response = await http.get(
+      Uri.parse('$baseUrl/gold_wallet_balance.php?user_id=$userId'),
+    );
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       return data['gold_balance'] ?? 0.0;
@@ -458,7 +513,9 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> getRecentTransactions() async {
     final userId = await SessionManager.getUserId();
     if (userId == null) throw Exception('User not logged in');
-    final response = await http.get(Uri.parse('$baseUrl/recent_transactions.php?user_id=$userId'));
+    final response = await http.get(
+      Uri.parse('$baseUrl/recent_transactions.php?user_id=$userId'),
+    );
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       return List<Map<String, dynamic>>.from(data['transactions'] ?? []);
@@ -477,17 +534,18 @@ class ApiService {
         Uri.parse('$baseUrl/getva_coin.php?action=getva_coin_settings'),
       );
       final data = jsonDecode(response.body);
-      
+
       // If API returns success, use the data
       if (data['success'] == true && data['data'] != null) {
         // Ensure is_enabled has a value (default to 1 if not set)
         final responseData = data['data'] as Map<String, dynamic>;
-        if (!responseData.containsKey('is_enabled') || responseData['is_enabled'] == null) {
+        if (!responseData.containsKey('is_enabled') ||
+            responseData['is_enabled'] == null) {
           responseData['is_enabled'] = '1';
         }
         return data;
       }
-      
+
       // If API fails, return default enabled settings
       return {
         'success': true,
@@ -505,17 +563,14 @@ class ApiService {
           'max_transfer': '1000',
           'promotion_active': '0',
           'promotion_bonus': '0',
-          'promotion_min_purchase': '0'
-        }
+          'promotion_min_purchase': '0',
+        },
       };
     } catch (e) {
       // Return default enabled settings on any error
       return {
         'success': true,
-        'data': {
-          'is_enabled': '1',
-          'exchange_rate': '1.00'
-        }
+        'data': {'is_enabled': '1', 'exchange_rate': '1.00'},
       };
     }
   }
@@ -524,67 +579,58 @@ class ApiService {
   // Users can now buy any amount of coins based on exchange rate
   static Future<Map<String, dynamic>> getGetvaCoinPackages() async {
     // Return empty array for backward compatibility
-    return {
-      'success': true,
-      'data': []
-    };
+    return {'success': true, 'data': []};
   }
 
   // Get Getva Coin wallet balance - with fallback
   static Future<Map<String, dynamic>> getGetvaCoinWallet(int userId) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/getva_coin.php?action=getva_coin_wallet&user_id=$userId'),
+        Uri.parse(
+          '$baseUrl/getva_coin.php?action=getva_coin_wallet&user_id=$userId',
+        ),
       );
       final data = jsonDecode(response.body);
-      
+
       if (data['success'] == true && data['data'] != null) {
         return data;
       }
-      
+
       // Return empty wallet if not found
       return {
         'success': true,
-        'data': {
-          'user_id': userId,
-          'coin_balance': '0.00'
-        }
+        'data': {'user_id': userId, 'coin_balance': '0.00'},
       };
     } catch (e) {
       // Return empty wallet on error
       return {
         'success': true,
-        'data': {
-          'user_id': userId,
-          'coin_balance': '0.00'
-        }
+        'data': {'user_id': userId, 'coin_balance': '0.00'},
       };
     }
   }
 
   // Get Getva Coin transactions - with fallback
-  static Future<Map<String, dynamic>> getGetvaCoinTransactions(int userId) async {
+  static Future<Map<String, dynamic>> getGetvaCoinTransactions(
+    int userId,
+  ) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/getva_coin.php?action=getva_coin_transactions&user_id=$userId'),
+        Uri.parse(
+          '$baseUrl/getva_coin.php?action=getva_coin_transactions&user_id=$userId',
+        ),
       );
       final data = jsonDecode(response.body);
-      
+
       if (data['success'] == true && data['data'] != null) {
         return data;
       }
-      
+
       // Return empty transactions if none found
-      return {
-        'success': true,
-        'data': []
-      };
+      return {'success': true, 'data': []};
     } catch (e) {
       // Return empty transactions on error
-      return {
-        'success': true,
-        'data': []
-      };
+      return {'success': true, 'data': []};
     }
   }
 
@@ -615,6 +661,7 @@ class ApiService {
     required int userId,
     required int coinAmount,
     required String utrNumber,
+    required String upiId,
   }) async {
     try {
       final response = await http.post(
@@ -625,6 +672,7 @@ class ApiService {
           'user_id': userId,
           'coin_amount': coinAmount,
           'utr_number': utrNumber,
+          'upi_id': upiId,
         }),
       );
       return jsonDecode(response.body);
@@ -633,4 +681,3 @@ class ApiService {
     }
   }
 }
-
