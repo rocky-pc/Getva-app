@@ -1796,18 +1796,19 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
                             companySymbol: stock.companySymbol,
                             quantity: qty,
                             pricePerShare: stock.currentPrice,
+                            paymentMethod: 'upi',
                           );
                           if (buyResult['success'] == true && mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text(buyResult['message'] ?? 'Shares purchased successfully'),
+                                content: Text(buyResult['message'] ?? 'Buy request submitted for verification'),
                                 backgroundColor: _green,
                               ),
                             );
                           } else if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text(buyResult['message'] ?? 'Failed to purchase shares'),
+                                content: Text(buyResult['message'] ?? 'Failed to submit buy request'),
                                 backgroundColor: _red,
                               ),
                             );
@@ -1836,6 +1837,7 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
                               companySymbol: stock.companySymbol,
                               quantity: qty,
                               pricePerShare: stock.currentPrice,
+                              paymentMethod: paymentMethod,
                             )
                           : await ApiService.sellShares(
                               userId: userId,

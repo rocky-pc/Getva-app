@@ -842,6 +842,7 @@ class ApiService {
     required String companySymbol,
     required int quantity,
     required double pricePerShare,
+    String paymentMethod = 'wallet',
   }) async {
     try {
       final response = await http.post(
@@ -854,6 +855,7 @@ class ApiService {
           'company_symbol': companySymbol,
           'quantity': quantity,
           'price_per_share': pricePerShare,
+          'payment_method': paymentMethod,
         }),
       );
       return jsonDecode(response.body);
