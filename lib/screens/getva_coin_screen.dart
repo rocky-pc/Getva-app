@@ -938,7 +938,7 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            const GetvaCoinIcon(size: 32),
+                            const GetvaCoinIcon(size: 35),
                             const SizedBox(width: 8),
                             Text(
                               balance.toStringAsFixed(2),
@@ -1762,7 +1762,7 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                     hintStyle: TextStyle(color: _textMuted.withOpacity(0.5)),
                     prefixIcon: const Padding(
                       padding: EdgeInsets.all(12),
-                      child: GetvaCoinIcon(size: 24),
+                      child: GetvaCoinIcon(size: 30),
                     ),
                     suffixText: 'GVC',
                     suffixStyle: const TextStyle(

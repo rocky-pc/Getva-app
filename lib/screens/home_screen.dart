@@ -539,7 +539,7 @@ class _LogoMark extends StatelessWidget {
     return Row(
       children: [
         // Icon mark
-        const GetvaCoinIcon(size: 38, isCircular: false),
+        const GetvaCoinIcon(size: 50, isCircular: false),
         const SizedBox(width: 10),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1705,7 +1705,7 @@ class _InvestmentOptionsSection extends StatelessWidget {
                 child: _InvestmentCard(
                   title: 'Getva Coin',
                   // subtitle: 'Coming Soon',
-                  iconWidget: const GetvaCoinIcon(size: 24),
+                  iconWidget: const GetvaCoinIcon(size: 50),
                   gradient: const LinearGradient(
                     colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
                     begin: Alignment.topLeft,

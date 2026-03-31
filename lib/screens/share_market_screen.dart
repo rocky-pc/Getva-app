@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'notifications_screen.dart';
+import 'upi_payment_screen.dart';
 import '../services/api_service.dart';
 import '../models/share_market.dart';
 import '../services/session_manager.dart';
@@ -45,6 +46,7 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
 
   List<Share> _shares = [];
   List<UserShareHolding> _userHoldings = [];
+  List<ShareTransaction> _transactions = [];
   Map<String, List<FlSpot>> _priceData = {};
   Map<String, List<FlSpot>> _volumeData = {};
 
@@ -100,10 +102,12 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
       if (userId != null) {
         final holdings = await ApiService.getUserShareHoldings(userId);
         final balance = await ApiService.getUserWalletBalance(userId);
+        final transactions = await ApiService.getUserShareTransactions(userId);
         if (mounted) {
           setState(() {
             _userHoldings = holdings;
             _walletBalance = balance;
+            _transactions = transactions;
           });
         }
       }
@@ -111,7 +115,6 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
       if (mounted) {
         setState(() {
           _shares = shares.isNotEmpty ? shares : _getMockShares();
-          // FIX: Reset index safely whenever shares list changes
           _selectedStockIndex = 0;
           _isLoading = false;
         });
@@ -1552,6 +1555,7 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
 
     final TextEditingController quantityController = TextEditingController();
     double totalAmount = 0;
+    String paymentMethod = 'wallet';
 
     if (!mounted) return;
 
@@ -1602,6 +1606,80 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
                     Text(
                       '₹${_walletBalance.toStringAsFixed(2)}',
                       style: const TextStyle(color: _gold, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Text('Payment Method', style: TextStyle(color: _textMuted, fontSize: 14)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setModalState(() => paymentMethod = 'wallet'),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: paymentMethod == 'wallet' ? _violet.withOpacity(0.2) : _cardBg2,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: paymentMethod == 'wallet' ? _violet : _border,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.account_balance_wallet,
+                                color: paymentMethod == 'wallet' ? _violet : _textMuted,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Wallet',
+                                style: TextStyle(
+                                  color: paymentMethod == 'wallet' ? _violet : _textMuted,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setModalState(() => paymentMethod = 'upi'),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: paymentMethod == 'upi' ? _violet.withOpacity(0.2) : _cardBg2,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: paymentMethod == 'upi' ? _violet : _border,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.payment,
+                                color: paymentMethod == 'upi' ? _violet : _textMuted,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'UPI',
+                                style: TextStyle(
+                                  color: paymentMethod == 'upi' ? _violet : _textMuted,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -1685,7 +1763,7 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
                       return;
                     }
 
-                    if (isBuy && totalAmount > _walletBalance) {
+                    if (isBuy && paymentMethod == 'wallet' && totalAmount > _walletBalance) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Insufficient wallet balance')),
                       );
@@ -1696,6 +1774,54 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Insufficient shares available to sell')),
                       );
+                      return;
+                    }
+
+                    if (isBuy && paymentMethod == 'upi') {
+                      Navigator.pop(context);
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => UpiPaymentScreen(
+                            initialAmount: totalAmount,
+                          ),
+                        ),
+                      );
+                      if (result == true) {
+                        setState(() => _isLoading = true);
+                        try {
+                          final buyResult = await ApiService.buyShares(
+                            userId: userId,
+                            shareId: stock.id,
+                            companySymbol: stock.companySymbol,
+                            quantity: qty,
+                            pricePerShare: stock.currentPrice,
+                          );
+                          if (buyResult['success'] == true && mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(buyResult['message'] ?? 'Shares purchased successfully'),
+                                backgroundColor: _green,
+                              ),
+                            );
+                          } else if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(buyResult['message'] ?? 'Failed to purchase shares'),
+                                backgroundColor: _red,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error: $e'), backgroundColor: _red),
+                            );
+                          }
+                        } finally {
+                          _loadData();
+                        }
+                      }
                       return;
                     }
 
@@ -1727,6 +1853,14 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
                               backgroundColor: _green,
                             ),
                           );
+                          final newBalance = result['remaining_balance'];
+                          if (newBalance != null) {
+                            setState(() {
+                              _walletBalance = (newBalance is num) 
+                                  ? newBalance.toDouble() 
+                                  : double.tryParse(newBalance.toString()) ?? _walletBalance;
+                            });
+                          }
                         }
                       } else {
                         if (mounted) {
@@ -1949,27 +2083,127 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
   }
 
   Widget _buildTransactionHistory() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: _cardBg,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _border),
-        ),
-        child: const Center(
-          child: Column(
-            children: [
-              Icon(Icons.history, color: _textMuted, size: 40),
-              SizedBox(height: 12),
-              Text(
-                'No recent transactions',
-                style: TextStyle(color: _textMuted, fontSize: 14),
-              ),
-            ],
+    final pendingSells = _transactions.where((t) => t.transactionType.contains('SELL_PENDING')).toList();
+    final completedSells = _transactions.where((t) => t.transactionType == 'SELL_APPROVED').toList();
+    final buys = _transactions.where((t) => t.transactionType == 'BUY').toList();
+    
+    if (_transactions.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: _cardBg,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: _border),
+          ),
+          child: const Center(
+            child: Column(
+              children: [
+                Icon(Icons.history, color: _textMuted, size: 40),
+                SizedBox(height: 12),
+                Text(
+                  'No recent transactions',
+                  style: TextStyle(color: _textMuted, fontSize: 14),
+                ),
+              ],
+            ),
           ),
         ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'TRANSACTIONS',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              color: _violet,
+              letterSpacing: 2,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (pendingSells.isNotEmpty) ...[
+            const Text('Pending Approvals', style: TextStyle(color: _gold, fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            ...pendingSells.map((t) => _buildTransactionItem(t, isPending: true)),
+            const SizedBox(height: 16),
+          ],
+          if (buys.isNotEmpty) ...[
+            const Text('Purchases', style: TextStyle(color: _green, fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            ...buys.map((t) => _buildTransactionItem(t)),
+            const SizedBox(height: 16),
+          ],
+          if (completedSells.isNotEmpty) ...[
+            const Text('Sales (Completed)', style: TextStyle(color: _red, fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            ...completedSells.map((t) => _buildTransactionItem(t)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTransactionItem(ShareTransaction t, {bool isPending = false}) {
+    final isBuy = t.transactionType == 'BUY';
+    final color = isPending ? _gold : (isBuy ? _green : _red);
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isPending ? _gold.withOpacity(0.3) : _border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              isBuy ? Icons.arrow_downward : Icons.arrow_upward,
+              color: color,
+              size: 16,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  t.companySymbol,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  '${t.quantity} shares @ ₹${t.pricePerShare.toStringAsFixed(2)}',
+                  style: const TextStyle(color: _textMuted, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${isBuy ? '-' : '+'}₹${t.totalAmount.toStringAsFixed(2)}',
+                style: TextStyle(color: color, fontWeight: FontWeight.w700),
+              ),
+              if (isPending)
+                const Text('Pending', style: TextStyle(color: _gold, fontSize: 10)),
+            ],
+          ),
+        ],
       ),
     );
   }

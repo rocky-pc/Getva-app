@@ -564,7 +564,7 @@ class _UpiPaymentScreenState extends State<UpiPaymentScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              Navigator.pop(context);
+              Navigator.pop(context, true);
             },
             child: const Text('OK', style: TextStyle(color: _gold)),
           ),

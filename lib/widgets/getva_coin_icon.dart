@@ -6,7 +6,7 @@ class GetvaCoinIcon extends StatelessWidget {
 
   const GetvaCoinIcon({
     super.key,
-    this.size = 24,
+    this.size = 100,
     this.isCircular = true,
   });
 
