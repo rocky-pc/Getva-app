@@ -6,6 +6,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../models/getva_coin.dart';
 import '../services/api_service.dart';
 import '../services/session_manager.dart';
+import '../widgets/getva_coin_icon.dart';
 import 'getva_coin_upi_payment_screen.dart';
 
 // ═══════════════════════════════════════════════════════════════
@@ -591,7 +592,7 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                     ],
                   ),
                   child: const Center(
-                    child: Text('🪙', style: TextStyle(fontSize: 32)),
+                    child: GetvaCoinIcon(size: 40),
                   ),
                 ),
               );
@@ -937,8 +938,10 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
+                            const GetvaCoinIcon(size: 32),
+                            const SizedBox(width: 8),
                             Text(
-                              '🪙 ${balance.toStringAsFixed(2)}',
+                              balance.toStringAsFixed(2),
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 36,
@@ -1003,7 +1006,7 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                               ],
                             ),
                             child: const Center(
-                              child: Text('🪙', style: TextStyle(fontSize: 32)),
+                              child: GetvaCoinIcon(size: 36),
                             ),
                           ),
                         );
@@ -1757,9 +1760,9 @@ class _GetvaCoinScreenState extends State<GetvaCoinScreen>
                     labelStyle: const TextStyle(color: _textMuted),
                     hintText: 'e.g., 100',
                     hintStyle: TextStyle(color: _textMuted.withOpacity(0.5)),
-                    prefixIcon: const Text(
-                      '🪙',
-                      style: TextStyle(fontSize: 24),
+                    prefixIcon: const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: GetvaCoinIcon(size: 24),
                     ),
                     suffixText: 'GVC',
                     suffixStyle: const TextStyle(

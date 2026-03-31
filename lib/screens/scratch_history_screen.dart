@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/session_manager.dart';
+import '../widgets/getva_coin_icon.dart';
 
 class ScratchHistoryScreen extends StatefulWidget {
   const ScratchHistoryScreen({super.key});
@@ -121,7 +122,8 @@ class _ScratchHistoryScreenState extends State<ScratchHistoryScreen> {
       }
     }
 
-    IconData icon;
+    IconData? icon;
+    Widget? iconWidget;
     Color color;
     String title;
     String subtitle;
@@ -134,8 +136,8 @@ class _ScratchHistoryScreenState extends State<ScratchHistoryScreen> {
         subtitle = 'Paid: ₹${boxPrice.toStringAsFixed(0)}';
         break;
       case 'reward':
-        icon = Icons.card_giftcard;
-        color = Colors.green;
+        iconWidget = const GetvaCoinIcon(size: 24);
+        color = const Color(0xFFD4A847);
         title = 'Won from $boxName';
         subtitle = 'Gained: ₹${amount.toStringAsFixed(2)}';
         break;
@@ -174,7 +176,7 @@ class _ScratchHistoryScreenState extends State<ScratchHistoryScreen> {
               color: color.withOpacity(0.15),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: color, size: 24),
+            child: iconWidget ?? Icon(icon, color: color, size: 24),
           ),
           const SizedBox(width: 16),
           Expanded(

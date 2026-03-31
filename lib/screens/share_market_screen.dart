@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'notifications_screen.dart';
+import '../services/api_service.dart';
+import '../models/share_market.dart';
+import '../services/session_manager.dart';
 
 // ── Enhanced Design Tokens ─────────────────────────────────────
 const _gold        = Color(0xFFD4A847);
@@ -37,86 +40,30 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
   bool _isLoading = true;
   int _selectedStockIndex = 0;
   bool _showVolumeChart = false;
+  int _selectedTabIndex = 0;
+  double _walletBalance = 0.0;
 
-  // Enhanced stock data with more details
-  final List<Map<String, dynamic>> _stocks = [
-    {
-      'symbol': 'TATASTEEL',
-      'name': 'Tata Steel Ltd.',
-      'price': 158.45,
-      'change': 2.35,
-      'changePercent': 1.50,
-      'high': 160.20,
-      'low': 155.80,
-      'volume': '12.4M',
-      'volumeNum': 12400000,
-      'pe': 12.5,
-      'marketCap': '195.2B',
-      'sector': 'Metals',
-    },
-    {
-      'symbol': 'RELIANCE',
-      'name': 'Reliance Industries',
-      'price': 2950.20,
-      'change': 15.40,
-      'changePercent': 0.52,
-      'high': 2975.00,
-      'low': 2930.50,
-      'volume': '8.2M',
-      'volumeNum': 8200000,
-      'pe': 24.8,
-      'marketCap': '1950.5B',
-      'sector': 'Energy',
-    },
-    {
-      'symbol': 'HDFCBANK',
-      'name': 'HDFC Bank Ltd.',
-      'price': 1445.60,
-      'change': -5.20,
-      'changePercent': -0.36,
-      'high': 1452.30,
-      'low': 1440.20,
-      'volume': '15.6M',
-      'volumeNum': 15600000,
-      'pe': 18.2,
-      'marketCap': '810.3B',
-      'sector': 'Banking',
-    },
-    {
-      'symbol': 'INFY',
-      'name': 'Infosys Ltd.',
-      'price': 1620.00,
-      'change': 12.80,
-      'changePercent': 0.80,
-      'high': 1632.50,
-      'low': 1608.30,
-      'volume': '9.8M',
-      'volumeNum': 9800000,
-      'pe': 22.4,
-      'marketCap': '670.8B',
-      'sector': 'IT',
-    },
-    {
-      'symbol': 'TCS',
-      'name': 'Tata Consultancy',
-      'price': 3890.45,
-      'change': -20.10,
-      'changePercent': -0.51,
-      'high': 3920.00,
-      'low': 3880.50,
-      'volume': '5.2M',
-      'volumeNum': 5200000,
-      'pe': 28.6,
-      'marketCap': '1425.3B',
-      'sector': 'IT',
-    },
-  ];
-
-  Map<String, dynamic> get _selectedStock => _stocks[_selectedStockIndex];
-
-  // Enhanced chart data for different periods
+  List<Share> _shares = [];
+  List<UserShareHolding> _userHoldings = [];
   Map<String, List<FlSpot>> _priceData = {};
   Map<String, List<FlSpot>> _volumeData = {};
+
+  String _formatVolume(int volume) {
+    if (volume >= 10000000) {
+      return '${(volume / 10000000).toStringAsFixed(1)}Cr';
+    } else if (volume >= 1000000) {
+      return '${(volume / 1000000).toStringAsFixed(1)}M';
+    } else if (volume >= 1000) {
+      return '${(volume / 1000).toStringAsFixed(1)}K';
+    }
+    return volume.toString();
+  }
+
+  // FIX: Safe getter — never force-unwrap
+  Share? get _selectedStock =>
+      _shares.isNotEmpty && _selectedStockIndex < _shares.length
+          ? _shares[_selectedStockIndex]
+          : null;
 
   late AnimationController _pulseCtrl;
   late AnimationController _orbCtrl;
@@ -140,82 +87,234 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
   @override
   void initState() {
     super.initState();
-    _initChartData();
     _initAnimations();
+    _loadData();
+  }
 
-    Future.delayed(const Duration(milliseconds: 800), () {
-      if (mounted) setState(() => _isLoading = false);
-    });
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (mounted) {
-        _entryCtrl.forward();
-        _chartAnimationCtrl.forward();
+  Future<void> _loadData() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+    try {
+      final shares = await ApiService.getShares();
+      final userId = await SessionManager.getUserId();
+      if (userId != null) {
+        final holdings = await ApiService.getUserShareHoldings(userId);
+        final balance = await ApiService.getUserWalletBalance(userId);
+        if (mounted) {
+          setState(() {
+            _userHoldings = holdings;
+            _walletBalance = balance;
+          });
+        }
       }
+
+      if (mounted) {
+        setState(() {
+          _shares = shares.isNotEmpty ? shares : _getMockShares();
+          // FIX: Reset index safely whenever shares list changes
+          _selectedStockIndex = 0;
+          _isLoading = false;
+        });
+        await _initChartData();
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) {
+            _entryCtrl.forward();
+            _chartAnimationCtrl.forward();
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _shares = _getMockShares();
+          _selectedStockIndex = 0;
+          _isLoading = false;
+        });
+        await _initChartData();
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) {
+            _entryCtrl.forward();
+            _chartAnimationCtrl.forward();
+          }
+        });
+      }
+    }
+  }
+
+  List<Share> _getMockShares() {
+    return [
+      Share(
+        id: 1,
+        companyId: 1,
+        companySymbol: 'RELIANCE',
+        companyName: 'Reliance Industries Ltd',
+        sector: 'Conglomerate',
+        currentPrice: 2450.50,
+        previousClose: 2435.25,
+        dayHigh: 2468.00,
+        dayLow: 2420.00,
+        volume: 2500000,
+        peRatio: 28.5,
+        marketCap: '18.5T',
+        change: 15.25,
+        changePercent: 0.62,
+        isActive: true,
+        lastUpdated: DateTime.now(),
+      ),
+      Share(
+        id: 2,
+        companyId: 2,
+        companySymbol: 'TCS',
+        companyName: 'Tata Consultancy Services',
+        sector: 'IT',
+        currentPrice: 3850.75,
+        previousClose: 3810.00,
+        dayHigh: 3875.00,
+        dayLow: 3795.00,
+        volume: 1200000,
+        peRatio: 32.1,
+        marketCap: '14.2T',
+        change: 40.75,
+        changePercent: 1.07,
+        isActive: true,
+        lastUpdated: DateTime.now(),
+      ),
+      Share(
+        id: 3,
+        companyId: 3,
+        companySymbol: 'INFY',
+        companyName: 'Infosys Ltd',
+        sector: 'IT',
+        currentPrice: 1680.25,
+        previousClose: 1695.00,
+        dayHigh: 1700.00,
+        dayLow: 1665.00,
+        volume: 890000,
+        peRatio: 25.8,
+        marketCap: '7.1T',
+        change: -14.75,
+        changePercent: -0.87,
+        isActive: true,
+        lastUpdated: DateTime.now(),
+      ),
+      Share(
+        id: 4,
+        companyId: 4,
+        companySymbol: 'HDFCBANK',
+        companyName: 'HDFC Bank Ltd',
+        sector: 'Banking',
+        currentPrice: 1680.00,
+        previousClose: 1675.50,
+        dayHigh: 1690.00,
+        dayLow: 1665.00,
+        volume: 1500000,
+        peRatio: 22.4,
+        marketCap: '12.8T',
+        change: 4.50,
+        changePercent: 0.27,
+        isActive: true,
+        lastUpdated: DateTime.now(),
+      ),
+      Share(
+        id: 5,
+        companyId: 5,
+        companySymbol: 'ICICIBANK',
+        companyName: 'ICICI Bank Ltd',
+        sector: 'Banking',
+        currentPrice: 985.50,
+        previousClose: 990.00,
+        dayHigh: 995.00,
+        dayLow: 975.00,
+        volume: 2100000,
+        peRatio: 18.6,
+        marketCap: '7.5T',
+        change: -4.50,
+        changePercent: -0.45,
+        isActive: true,
+        lastUpdated: DateTime.now(),
+      ),
+    ];
+  }
+
+  Future<void> _initChartData() async {
+    // FIX: Guard against null selected stock
+    final stock = _selectedStock;
+    if (stock == null) return;
+
+    try {
+      final historyData = await ApiService.getSharePriceHistory(
+        symbol: stock.companySymbol,
+        period: _selectedPeriod,
+      );
+      if (historyData.isNotEmpty && mounted) {
+        setState(() {
+          _priceData[_selectedPeriod] = historyData.map((point) =>
+              FlSpot(
+                (point['x'] as num?)?.toDouble() ?? 0,
+                (point['y'] as num?)?.toDouble() ?? 0,
+              )
+          ).toList();
+        });
+      } else {
+        _generateMockChartData();
+      }
+    } catch (e) {
+      _generateMockChartData();
+    }
+
+    _generateVolumeData();
+  }
+
+  void _generateMockChartData() {
+    final stock = _selectedStock;
+    if (stock == null) return;
+
+    final random = math.Random(42);
+    final basePrice = stock.currentPrice;
+    final periods = {
+      '1D': 24,
+      '1W': 7,
+      '1M': 30,
+      '1Y': 52,
+      'ALL': 120,
+    };
+
+    final ranges = {
+      '1D': {'variance': 1.2, 'min': -8.0, 'max': 8.0},
+      '1W': {'variance': 2.5, 'min': -15.0, 'max': 15.0},
+      '1M': {'variance': 3.0, 'min': -25.0, 'max': 20.0},
+      '1Y': {'variance': 4.0, 'min': -45.0, 'max': 35.0},
+      'ALL': {'variance': 3.5, 'min': -70.0, 'max': 60.0},
+    };
+
+    periods.forEach((period, points) {
+      final range = ranges[period]!;
+      List<FlSpot> data = [];
+      double price = basePrice + range['min']!;
+
+      for (int i = 0; i < points; i++) {
+        double change = (random.nextDouble() - 0.5) * range['variance']!;
+        price = (price + change).clamp(
+          basePrice + range['min']!,
+          basePrice + range['max']!,
+        );
+        data.add(FlSpot(i.toDouble(), price));
+      }
+      _priceData[period] = data;
     });
   }
 
-  void _initChartData() {
-    // Generate realistic chart data for each period
-    final random = math.Random(42);
-    final basePrice = _selectedStock['price'];
-
-    // 1D data (24 points - hourly)
-    List<FlSpot> dayData = [];
-    double price = basePrice - 5;
-    for (int i = 0; i < 24; i++) {
-      double change = (random.nextDouble() - 0.5) * 1.2;
-      price = (price + change).clamp(basePrice - 8.0, basePrice + 8.0).toDouble();
-      dayData.add(FlSpot(i.toDouble(), price));
-    }
-    _priceData['1D'] = dayData;
-
-    // 1W data (7 points - daily)
-    List<FlSpot> weekData = [];
-    price = basePrice - 8;
-    for (int i = 0; i < 7; i++) {
-      double change = (random.nextDouble() - 0.5) * 2.5;
-      price = (price + change).clamp(basePrice - 15.0, basePrice + 15.0).toDouble();
-      weekData.add(FlSpot(i.toDouble(), price));
-    }
-    _priceData['1W'] = weekData;
-
-    // 1M data (30 points)
-    List<FlSpot> monthData = [];
-    price = basePrice - 12;
-    for (int i = 0; i < 30; i++) {
-      double change = (random.nextDouble() - 0.5) * 3;
-      price = (price + change).clamp(basePrice - 25.0, basePrice + 20.0).toDouble();
-      monthData.add(FlSpot(i.toDouble(), price));
-    }
-    _priceData['1M'] = monthData;
-
-    // 1Y data (52 points - weekly)
-    List<FlSpot> yearData = [];
-    price = basePrice - 30;
-    for (int i = 0; i < 52; i++) {
-      double change = (random.nextDouble() - 0.5) * 4;
-      price = (price + change).clamp(basePrice - 45.0, basePrice + 35.0).toDouble();
-      yearData.add(FlSpot(i.toDouble(), price));
-    }
-    _priceData['1Y'] = yearData;
-
-    // ALL data (120 points)
-    List<FlSpot> allData = [];
-    price = basePrice - 50;
-    for (int i = 0; i < 120; i++) {
-      double change = (random.nextDouble() - 0.5) * 3.5;
-      price = (price + change).clamp(basePrice - 70.0, basePrice + 60.0).toDouble();
-      allData.add(FlSpot(i.toDouble(), price));
-    }
-    _priceData['ALL'] = allData;
-
-    // Volume data
+  void _generateVolumeData() {
+    final random = math.Random(77);
     for (var period in ['1D', '1W', '1M', '1Y', 'ALL']) {
-      List<FlSpot> volumes = [];
-      for (int i = 0; i < _priceData[period]!.length; i++) {
-        volumes.add(FlSpot(i.toDouble(), random.nextDouble() * 15 + 5));
+      final periodData = _priceData[period];
+      if (periodData != null) {
+        List<FlSpot> volumes = [];
+        for (int i = 0; i < periodData.length; i++) {
+          volumes.add(FlSpot(i.toDouble(), random.nextDouble() * 15 + 5));
+        }
+        _volumeData[period] = volumes;
       }
-      _volumeData[period] = volumes;
     }
   }
 
@@ -266,10 +365,14 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
 
   @override
   void dispose() {
-    _pulseCtrl.dispose(); _orbCtrl.dispose();
-    _particleCtrl.dispose(); _entryCtrl.dispose();
-    _shimmerCtrl.dispose(); _chartAnimationCtrl.dispose();
-    _glowCtrl.dispose(); _indicatorCtrl.dispose();
+    _pulseCtrl.dispose();
+    _orbCtrl.dispose();
+    _particleCtrl.dispose();
+    _entryCtrl.dispose();
+    _shimmerCtrl.dispose();
+    _chartAnimationCtrl.dispose();
+    _glowCtrl.dispose();
+    _indicatorCtrl.dispose();
     super.dispose();
   }
 
@@ -280,13 +383,13 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
       backgroundColor: _surface,
       body: Stack(
         children: [
-          // Enhanced animated background
+          // Animated background
           Positioned.fill(
             child: AnimatedBuilder(
               animation: _glowAnim,
               builder: (context, child) {
                 return Container(
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
@@ -341,7 +444,7 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
             ),
           ),
 
-          // Enhanced particle system
+          // Particle system
           Positioned.fill(
             child: AnimatedBuilder(
               animation: _particleCtrl,
@@ -370,33 +473,97 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
               slivers: [
                 _buildEnhancedAppBar(),
                 const SliverToBoxAdapter(child: SizedBox(height: 16)),
-                SliverToBoxAdapter(
-                    child: _AnimatedReveal(animation: _entryAnim, delay: 0.0, child: _buildEnhancedHeroCard())
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: 24)),
-                SliverToBoxAdapter(
-                    child: _AnimatedReveal(animation: _entryAnim, delay: 0.1, child: _buildStockSelector())
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: 24)),
-                SliverToBoxAdapter(
-                    child: _AnimatedReveal(animation: _entryAnim, delay: 0.15, child: _buildEnhancedPeriodSelector())
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: 24)),
-                SliverToBoxAdapter(
-                    child: _AnimatedReveal(animation: _entryAnim, delay: 0.2, child: _buildEnhancedChartSection())
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: 16)),
-                SliverToBoxAdapter(
-                    child: _AnimatedReveal(animation: _entryAnim, delay: 0.25, child: _buildChartTypeToggle())
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: 24)),
-                SliverToBoxAdapter(
-                    child: _AnimatedReveal(animation: _entryAnim, delay: 0.3, child: _buildEnhancedStatsGrid())
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: 24)),
-                SliverToBoxAdapter(
-                    child: _AnimatedReveal(animation: _entryAnim, delay: 0.4, child: _buildEnhancedTrendingSection())
-                ),
+                if (_selectedTabIndex == 0) ...[
+                  SliverToBoxAdapter(
+                    child: _AnimatedReveal(
+                      animation: _entryAnim,
+                      delay: 0.0,
+                      child: _buildEnhancedHeroCard(),
+                    ),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                  SliverToBoxAdapter(
+                    child: _AnimatedReveal(
+                      animation: _entryAnim,
+                      delay: 0.1,
+                      child: _buildStockSelector(),
+                    ),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                  SliverToBoxAdapter(
+                    child: _AnimatedReveal(
+                      animation: _entryAnim,
+                      delay: 0.15,
+                      child: _buildEnhancedPeriodSelector(),
+                    ),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                  SliverToBoxAdapter(
+                    child: _AnimatedReveal(
+                      animation: _entryAnim,
+                      delay: 0.2,
+                      child: _buildEnhancedChartSection(),
+                    ),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                  SliverToBoxAdapter(
+                    child: _AnimatedReveal(
+                      animation: _entryAnim,
+                      delay: 0.25,
+                      child: _buildChartTypeToggle(),
+                    ),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                  SliverToBoxAdapter(
+                    child: _AnimatedReveal(
+                      animation: _entryAnim,
+                      delay: 0.3,
+                      child: _buildTradeButtons(),
+                    ),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                  // FIX: Guard stats grid — only show when stock is available
+                  if (_selectedStock != null)
+                    SliverToBoxAdapter(
+                      child: _AnimatedReveal(
+                        animation: _entryAnim,
+                        delay: 0.35,
+                        child: _buildEnhancedStatsGrid(),
+                      ),
+                    ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                  SliverToBoxAdapter(
+                    child: _AnimatedReveal(
+                      animation: _entryAnim,
+                      delay: 0.4,
+                      child: _buildEnhancedTrendingSection(),
+                    ),
+                  ),
+                ] else ...[
+                  SliverToBoxAdapter(
+                    child: _AnimatedReveal(
+                      animation: _entryAnim,
+                      delay: 0.0,
+                      child: _buildPortfolioOverview(),
+                    ),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                  SliverToBoxAdapter(
+                    child: _AnimatedReveal(
+                      animation: _entryAnim,
+                      delay: 0.1,
+                      child: _buildHoldingsList(),
+                    ),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                  SliverToBoxAdapter(
+                    child: _AnimatedReveal(
+                      animation: _entryAnim,
+                      delay: 0.2,
+                      child: _buildTransactionHistory(),
+                    ),
+                  ),
+                ],
                 const SliverToBoxAdapter(child: SizedBox(height: 40)),
               ],
             ),
@@ -411,7 +578,7 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          TweenAnimationBuilder(
+          TweenAnimationBuilder<double>(
             tween: Tween<double>(begin: 0, end: 1),
             duration: const Duration(milliseconds: 800),
             builder: (context, value, child) {
@@ -464,150 +631,117 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
     return SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        child: Row(
-          children: [
-            _EnhancedGlassButton(
-                onTap: () => Navigator.pop(context),
-                child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18)
-            ),
-            const SizedBox(width: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                        _selectedStock['symbol'],
-                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: _violet.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        _selectedStock['sector'],
-                        style: const TextStyle(color: _violetLight, fontSize: 10, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                    _selectedStock['name'],
-                    style: const TextStyle(color: _textMuted, fontSize: 12, fontWeight: FontWeight.w500)
-                ),
-              ],
-            ),
-            const Spacer(),
-            _EnhancedGlassButton(
-                onTap: () {},
-                child: const Icon(Icons.search_rounded, color: Colors.white, size: 20)
-            ),
-            const SizedBox(width: 8),
-            _EnhancedGlassButton(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const NotificationsScreen()),
-                  );
-                },
-                child: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 20)
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEnhancedHeroCard() {
-    final stock = _selectedStock;
-    final price = stock['price'] as double;
-    final change = stock['change'] as double;
-    final changePercent = stock['changePercent'] as double;
-    final isUp = change >= 0;
-    
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              _cardBg,
-              _cardBg2.withOpacity(0.8),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _border.withOpacity(0.5), width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: (isUp ? _green : _red).withOpacity(0.15),
-              blurRadius: 20,
-              spreadRadius: 2,
-            ),
-          ],
-        ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Current Price',
-                      style: TextStyle(color: _textMuted, fontSize: 12, fontWeight: FontWeight.w500),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '₹${price.toStringAsFixed(2)}',
-                      style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900),
-                    ),
-                  ],
+                _EnhancedGlassButton(
+                  onTap: () => Navigator.pop(context),
+                  child: const Icon(Icons.arrow_back_ios_new_rounded,
+                      color: Colors.white, size: 18),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: (isUp ? _green : _red).withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isUp ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
-                        color: isUp ? _green : _red,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${isUp ? '+' : ''}${change.toStringAsFixed(2)} (${changePercent.toStringAsFixed(2)}%)',
-                        style: TextStyle(
-                          color: isUp ? _green : _red,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
+                const SizedBox(width: 16),
+                const Text(
+                  'Share Market',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900),
+                ),
+                const Spacer(),
+                _EnhancedGlassButton(
+                  onTap: _loadData,
+                  child: const Icon(Icons.refresh_rounded,
+                      color: Colors.white, size: 20),
+                ),
+                const SizedBox(width: 8),
+                _EnhancedGlassButton(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const NotificationsScreen()),
+                    );
+                  },
+                  child: const Icon(Icons.notifications_none_rounded,
+                      color: Colors.white, size: 20),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                _buildMiniStat('High', '₹${(stock['high'] as double).toStringAsFixed(2)}', _green),
-                const SizedBox(width: 24),
-                _buildMiniStat('Low', '₹${(stock['low'] as double).toStringAsFixed(2)}', _red),
-                const SizedBox(width: 24),
-                _buildMiniStat('Volume', stock['volume'] as String, _violet),
-              ],
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: _cardBg.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _border),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _selectedTabIndex = 0),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 10),
+                        decoration: BoxDecoration(
+                          gradient: _selectedTabIndex == 0
+                              ? const LinearGradient(
+                              colors: [_violet, _violetDark])
+                              : null,
+                          color: _selectedTabIndex == 0
+                              ? null
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          'Market',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: _selectedTabIndex == 0
+                                ? Colors.white
+                                : _textMuted,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _selectedTabIndex = 1),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 10),
+                        decoration: BoxDecoration(
+                          gradient: _selectedTabIndex == 1
+                              ? const LinearGradient(
+                              colors: [_violet, _violetDark])
+                              : null,
+                          color: _selectedTabIndex == 1
+                              ? null
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          'Portfolio',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: _selectedTabIndex == 1
+                                ? Colors.white
+                                : _textMuted,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -621,43 +755,50 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
       children: [
         Text(
           label,
-          style: const TextStyle(color: _textMuted, fontSize: 10, fontWeight: FontWeight.w500),
+          style: const TextStyle(
+              color: _textMuted, fontSize: 10, fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 2),
         Text(
           value,
-          style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.w700),
+          style: TextStyle(
+              color: color, fontSize: 14, fontWeight: FontWeight.w700),
         ),
       ],
     );
   }
 
   Widget _buildStockSelector() {
+    if (_shares.isEmpty) return const SizedBox.shrink();
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: SizedBox(
         height: 60,
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
-          itemCount: _stocks.length,
+          itemCount: _shares.length,
           itemBuilder: (context, index) {
-            final stock = _stocks[index];
+            final share = _shares[index];
             final isSelected = _selectedStockIndex == index;
-            final isUp = stock['change'] >= 0;
+            final isUp = share.change >= 0;
 
             return GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectedStockIndex = index;
-                  _initChartData();
-                });
-                _chartAnimationCtrl.reset();
-                _chartAnimationCtrl.forward();
+              onTap: () async {
+                setState(() => _selectedStockIndex = index);
+                _priceData.clear();
+                _volumeData.clear();
+                await _initChartData();
+                if (mounted) {
+                  _chartAnimationCtrl.reset();
+                  _chartAnimationCtrl.forward();
+                }
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 margin: const EdgeInsets.only(right: 12),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   gradient: isSelected
                       ? const LinearGradient(colors: [_violet, _violetDark])
@@ -674,7 +815,7 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      stock['symbol'],
+                      share.companySymbol,
                       style: TextStyle(
                         color: isSelected ? Colors.white : _textPrimary,
                         fontWeight: FontWeight.w800,
@@ -691,7 +832,7 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
                         ),
                         const SizedBox(width: 2),
                         Text(
-                          '${stock['changePercent'].toStringAsFixed(2)}%',
+                          '${share.changePercent.toStringAsFixed(2)}%',
                           style: TextStyle(
                             color: isUp ? _green : _red,
                             fontSize: 10,
@@ -723,7 +864,8 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: periods.map((p) => Expanded(
+          children: periods
+              .map((p) => Expanded(
             child: GestureDetector(
               onTap: () {
                 setState(() => _selectedPeriod = p);
@@ -732,26 +874,33 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 10),
                 decoration: BoxDecoration(
                   gradient: _selectedPeriod == p
-                      ? const LinearGradient(colors: [_violet, _violetDark])
+                      ? const LinearGradient(
+                      colors: [_violet, _violetDark])
                       : null,
-                  color: _selectedPeriod == p ? null : Colors.transparent,
+                  color: _selectedPeriod == p
+                      ? null
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   p,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: _selectedPeriod == p ? Colors.white : _textMuted,
+                    color: _selectedPeriod == p
+                        ? Colors.white
+                        : _textMuted,
                     fontWeight: FontWeight.w800,
                     fontSize: 12,
                   ),
                 ),
               ),
             ),
-          )).toList(),
+          ))
+              .toList(),
         ),
       ),
     );
@@ -775,7 +924,8 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
     );
   }
 
-  Widget _buildToggleButton(String text, bool isSelected, VoidCallback onTap) {
+  Widget _buildToggleButton(
+      String text, bool isSelected, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -799,11 +949,17 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
   }
 
   Widget _buildEnhancedChartSection() {
-    final spots = _showVolumeChart
-        ? (_volumeData[_selectedPeriod] ?? _priceData[_selectedPeriod]!)
-        : (_priceData[_selectedPeriod] ?? _priceData['1D']!);
+    // FIX: Use local variable and guard early
+    final stock = _selectedStock;
+    if (stock == null) return const SizedBox.shrink();
 
-    final isUp = _selectedStock['change'] >= 0;
+    final spots = _showVolumeChart
+        ? (_volumeData[_selectedPeriod] ?? _priceData[_selectedPeriod] ?? [])
+        : (_priceData[_selectedPeriod] ?? _priceData['1D'] ?? []);
+
+    if (spots.isEmpty) return const SizedBox.shrink();
+
+    final isUp = stock.change >= 0;
     final chartColor = isUp ? _greenLight : _redLight;
 
     return Padding(
@@ -815,7 +971,7 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
             height: 280,
             padding: const EdgeInsets.fromLTRB(12, 20, 20, 12),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
+              gradient: const LinearGradient(
                 colors: [_cardBg2, _cardBg],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -836,7 +992,8 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: chartColor.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(8),
@@ -862,13 +1019,11 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
                         show: true,
                         drawVerticalLine: false,
                         horizontalInterval: _showVolumeChart ? 5 : 20,
-                        getDrawingHorizontalLine: (value) {
-                          return FlLine(
-                            color: _textMuted.withOpacity(0.1),
-                            strokeWidth: 1,
-                            dashArray: [5, 5],
-                          );
-                        },
+                        getDrawingHorizontalLine: (value) => FlLine(
+                          color: _textMuted.withOpacity(0.1),
+                          strokeWidth: 1,
+                          dashArray: [5, 5],
+                        ),
                       ),
                       titlesData: FlTitlesData(
                         show: true,
@@ -877,17 +1032,16 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
                             showTitles: true,
                             reservedSize: 25,
                             getTitlesWidget: (value, meta) {
-                              int index = value.toInt();
-                              int interval = _getInterval();
-                              if (index % interval == 0 && index < spots.length) {
+                              final index = value.toInt();
+                              final interval = _getInterval();
+                              if (index % interval == 0 &&
+                                  index < spots.length) {
                                 return Padding(
                                   padding: const EdgeInsets.only(top: 8),
                                   child: Text(
                                     _getXLabel(index),
                                     style: const TextStyle(
-                                      color: _textMuted,
-                                      fontSize: 10,
-                                    ),
+                                        color: _textMuted, fontSize: 10),
                                   ),
                                 );
                               }
@@ -904,28 +1058,29 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
                                 return Text(
                                   '${(value / 1000).toStringAsFixed(0)}K',
                                   style: const TextStyle(
-                                    color: _textMuted,
-                                    fontSize: 10,
-                                  ),
+                                      color: _textMuted, fontSize: 10),
                                 );
                               }
                               return Text(
                                 '₹${value.toStringAsFixed(0)}',
                                 style: const TextStyle(
-                                  color: _textMuted,
-                                  fontSize: 10,
-                                ),
+                                    color: _textMuted, fontSize: 10),
                               );
                             },
                           ),
                         ),
-                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        topTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
                       ),
                       borderData: FlBorderData(show: false),
                       lineBarsData: [
                         LineChartBarData(
-                          spots: spots.map((spot) => FlSpot(spot.x, spot.y * _chartAnim.value)).toList(),
+                          spots: spots
+                              .map((spot) =>
+                              FlSpot(spot.x, spot.y * _chartAnim.value))
+                              .toList(),
                           isCurved: true,
                           color: chartColor,
                           barWidth: 3,
@@ -948,18 +1103,26 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
                       lineTouchData: LineTouchData(
                         touchTooltipData: LineTouchTooltipData(
                           tooltipRoundedRadius: 12,
-                          tooltipBorder: BorderSide(color: chartColor.withOpacity(0.5), width: 1),
-                          getTooltipItems: (List<LineBarSpot> touchedSpots) {
+                          tooltipBorder: BorderSide(
+                              color: chartColor.withOpacity(0.5), width: 1),
+                          getTooltipItems:
+                              (List<LineBarSpot> touchedSpots) {
                             return touchedSpots.map((spot) {
                               if (_showVolumeChart) {
                                 return LineTooltipItem(
                                   'Volume: ${(spot.y / 1000).toStringAsFixed(0)}K',
-                                  TextStyle(color: chartColor, fontWeight: FontWeight.bold, fontSize: 12),
+                                  TextStyle(
+                                      color: chartColor,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12),
                                 );
                               }
                               return LineTooltipItem(
                                 '₹${spot.y.toStringAsFixed(2)}',
-                                TextStyle(color: chartColor, fontWeight: FontWeight.bold, fontSize: 12),
+                                TextStyle(
+                                    color: chartColor,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12),
                               );
                             }).toList();
                           },
@@ -982,7 +1145,7 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
       case '1W': return 1;
       case '1M': return 5;
       case '1Y': return 10;
-      default: return 15;
+      default:   return 15;
     }
   }
 
@@ -996,7 +1159,10 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
       case '1M':
         return 'Day ${index + 1}';
       case '1Y':
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const months = [
+          'Jan','Feb','Mar','Apr','May','Jun',
+          'Jul','Aug','Sep','Oct','Nov','Dec'
+        ];
         return months[index % 12];
       default:
         return '';
@@ -1024,7 +1190,7 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
           const SizedBox(width: 6),
           Text(
             isUp ? 'Bullish Trend' : 'Bearish Trend',
-            style: TextStyle(color: _textMuted, fontSize: 10),
+            style: const TextStyle(color: _textMuted, fontSize: 10),
           ),
         ],
       ),
@@ -1032,6 +1198,10 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
   }
 
   Widget _buildEnhancedStatsGrid() {
+    // FIX: Use local variable — caller already guards with if (_selectedStock != null)
+    final stock = _selectedStock;
+    if (stock == null) return const SizedBox.shrink();
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -1055,14 +1225,42 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
             mainAxisSpacing: 12,
             crossAxisSpacing: 12,
             children: [
-              _buildEnhancedStatItem('Open', '₹${_selectedStock['price'] - 2.5}'),
-              _buildEnhancedStatItem('Prev. Close', '₹${_selectedStock['price'] - _selectedStock['change']}'),
-              _buildEnhancedStatItem('Day High', '₹${_selectedStock['high']}', Icons.arrow_upward, _green),
-              _buildEnhancedStatItem('Day Low', '₹${_selectedStock['low']}', Icons.arrow_downward, _red),
-              _buildEnhancedStatItem('Volume', _selectedStock['volume'], Icons.trending_up, _cyan),
-              _buildEnhancedStatItem('P/E Ratio', _selectedStock['pe'].toString(), Icons.pie_chart, _violet),
-              _buildEnhancedStatItem('Market Cap', _selectedStock['marketCap'], Icons.account_balance, _gold),
-              _buildEnhancedStatItem('52W Range', '₹120 - ₹175', Icons.show_chart, _violetLight),
+              _buildEnhancedStatItem(
+                  'Open',
+                  '₹${(stock.currentPrice - 2.5).toStringAsFixed(2)}'),
+              _buildEnhancedStatItem(
+                  'Prev. Close',
+                  '₹${stock.previousClose.toStringAsFixed(2)}'),
+              _buildEnhancedStatItem(
+                  'Day High',
+                  '₹${stock.dayHigh.toStringAsFixed(2)}',
+                  Icons.arrow_upward,
+                  _green),
+              _buildEnhancedStatItem(
+                  'Day Low',
+                  '₹${stock.dayLow.toStringAsFixed(2)}',
+                  Icons.arrow_downward,
+                  _red),
+              _buildEnhancedStatItem(
+                  'Volume',
+                  _formatVolume(stock.volume),
+                  Icons.trending_up,
+                  _cyan),
+              _buildEnhancedStatItem(
+                  'P/E Ratio',
+                  stock.peRatio.toStringAsFixed(2),
+                  Icons.pie_chart,
+                  _violet),
+              _buildEnhancedStatItem(
+                  'Market Cap',
+                  stock.marketCap,
+                  Icons.account_balance,
+                  _gold),
+              _buildEnhancedStatItem(
+                  '52W Range',
+                  '₹120 - ₹175',
+                  Icons.show_chart,
+                  _violetLight),
             ],
           ),
         ],
@@ -1070,11 +1268,12 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
     );
   }
 
-  Widget _buildEnhancedStatItem(String label, String value, [IconData? icon, Color? iconColor]) {
+  Widget _buildEnhancedStatItem(String label, String value,
+      [IconData? icon, Color? iconColor]) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           colors: [_cardBg, _cardBg2],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -1095,7 +1294,10 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
               Expanded(
                 child: Text(
                   label,
-                  style: const TextStyle(color: _textMuted, fontSize: 11, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                      color: _textMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1105,11 +1307,669 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
           const SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w800),
+            style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w800),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildEnhancedHeroCard() {
+    // FIX: Use local variable and guard
+    final stock = _selectedStock;
+    if (stock == null) return const SizedBox.shrink();
+
+    final isUp = stock.change >= 0;
+    final color = isUp ? _green : _red;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [_cardBg2, _cardBg],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: _border),
+          boxShadow: [
+            BoxShadow(
+              color: _violet.withOpacity(0.15),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        color.withOpacity(0.2),
+                        color.withOpacity(0.05)
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      isUp ? Icons.trending_up : Icons.trending_down,
+                      color: color,
+                      size: 28,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        stock.companySymbol,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        stock.companyName,
+                        style: const TextStyle(
+                          color: _textMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '₹${stock.currentPrice.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isUp ? Icons.arrow_upward : Icons.arrow_downward,
+                        color: color,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${isUp ? '+' : ''}${stock.changePercent.toStringAsFixed(2)}%',
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTradeButtons() {
+    final stock = _selectedStock;
+    if (stock == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _showTradeDialog(true),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [_green, _green.withOpacity(0.8)],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _green.withOpacity(0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Text(
+                  'BUY',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _showTradeDialog(false),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [_red, _red.withOpacity(0.8)],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _red.withOpacity(0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Text(
+                  'SELL',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showTradeDialog(bool isBuy) async {
+    final stock = _selectedStock;
+    if (stock == null) return;
+
+    final userId = await SessionManager.getUserId();
+    if (userId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please login to trade')),
+        );
+      }
+      return;
+    }
+
+    int availableQty = 0;
+    if (!isBuy) {
+      try {
+        final holding = _userHoldings.firstWhere(
+          (h) => h.companySymbol == stock.companySymbol,
+        );
+        availableQty = holding.quantity;
+      } catch (e) {
+        availableQty = 0;
+      }
+    }
+
+    final TextEditingController quantityController = TextEditingController();
+    double totalAmount = 0;
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 20,
+            right: 20,
+            top: 24,
+          ),
+          decoration: const BoxDecoration(
+            color: _cardBg,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+            border: Border(top: BorderSide(color: _border)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${isBuy ? 'Buy' : 'Sell'} ${stock.companySymbol}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, color: _textMuted),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              if (isBuy) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Wallet Balance', style: TextStyle(color: _textMuted)),
+                    Text(
+                      '₹${_walletBalance.toStringAsFixed(2)}',
+                      style: const TextStyle(color: _gold, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+              ] else ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Available Shares', style: TextStyle(color: _textMuted)),
+                    Text(
+                      '$availableQty Shares',
+                      style: const TextStyle(color: _violet, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+              ],
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Price per share', style: TextStyle(color: _textMuted)),
+                  Text(
+                    '₹${stock.currentPrice.toStringAsFixed(2)}',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: quantityController,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.white, fontSize: 18),
+                onChanged: (value) {
+                  final qty = int.tryParse(value) ?? 0;
+                  setModalState(() {
+                    totalAmount = qty * stock.currentPrice;
+                  });
+                },
+                decoration: InputDecoration(
+                  labelText: 'Quantity',
+                  labelStyle: const TextStyle(color: _textMuted),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: _border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: _violet),
+                  ),
+                  suffixText: 'Shares',
+                  suffixStyle: const TextStyle(color: _textMuted),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Divider(color: _border),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Total Value', style: TextStyle(color: _textMuted, fontSize: 16)),
+                  Text(
+                    '₹${totalAmount.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final qty = int.tryParse(quantityController.text) ?? 0;
+                    if (qty <= 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Enter valid quantity')),
+                      );
+                      return;
+                    }
+
+                    if (isBuy && totalAmount > _walletBalance) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Insufficient wallet balance')),
+                      );
+                      return;
+                    }
+
+                    if (!isBuy && qty > availableQty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Insufficient shares available to sell')),
+                      );
+                      return;
+                    }
+
+                    Navigator.pop(context);
+                    setState(() => _isLoading = true);
+
+                    try {
+                      final result = isBuy
+                          ? await ApiService.buyShares(
+                              userId: userId,
+                              shareId: stock.id,
+                              companySymbol: stock.companySymbol,
+                              quantity: qty,
+                              pricePerShare: stock.currentPrice,
+                            )
+                          : await ApiService.sellShares(
+                              userId: userId,
+                              shareId: stock.id,
+                              companySymbol: stock.companySymbol,
+                              quantity: qty,
+                              pricePerShare: stock.currentPrice,
+                            );
+
+                      if (result['success'] == true) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(result['message'] ?? 'Trade successful'),
+                              backgroundColor: _green,
+                            ),
+                          );
+                        }
+                      } else {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(result['message'] ?? 'Trade failed'),
+                              backgroundColor: _red,
+                            ),
+                          );
+                        }
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error: $e'), backgroundColor: _red),
+                        );
+                      }
+                    } finally {
+                      _loadData();
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isBuy ? _green : _red,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  child: Text(
+                    isBuy ? 'CONFIRM BUY' : 'CONFIRM SELL',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPortfolioOverview() {
+    final totalValue = _userHoldings.fold<double>(
+        0, (sum, h) => sum + h.totalValue);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [_cardBg2, _cardBg],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: _border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'PORTFOLIO VALUE',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: _textMuted,
+                letterSpacing: 2,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '₹${totalValue.toStringAsFixed(2)}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                _buildMiniStat(
+                    'Holdings', '${_userHoldings.length}', _violet),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHoldingsList() {
+    if (_userHoldings.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Container(
+          padding: const EdgeInsets.all(40),
+          decoration: BoxDecoration(
+            color: _cardBg,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: _border),
+          ),
+          child: const Center(
+            child: Column(
+              children: [
+                Icon(Icons.account_balance_wallet,
+                    color: _textMuted, size: 48),
+                SizedBox(height: 12),
+                Text(
+                  'No holdings yet',
+                  style: TextStyle(color: _textMuted, fontSize: 16),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'YOUR HOLDINGS',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              color: _violet,
+              letterSpacing: 2,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ..._userHoldings.map((holding) {
+            final isUp = holding.profitLoss >= 0;
+            final color = isUp ? _green : _red;
+            final changePercent = holding.averagePrice > 0
+                ? ((holding.currentPrice - holding.averagePrice) /
+                holding.averagePrice) *
+                100
+                : 0.0;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [_cardBg, _cardBg2],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _border),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          holding.companySymbol,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${holding.quantity} shares',
+                          style: const TextStyle(
+                              color: _textMuted, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '₹${holding.totalValue.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '${isUp ? '+' : ''}${changePercent.toStringAsFixed(2)}%',
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTransactionHistory() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: _cardBg,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _border),
+        ),
+        child: const Center(
+          child: Column(
+            children: [
+              Icon(Icons.history, color: _textMuted, size: 40),
+              SizedBox(height: 12),
+              Text(
+                'No recent transactions',
+                style: TextStyle(color: _textMuted, fontSize: 14),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1126,7 +1986,8 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
                 width: 4,
                 height: 20,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [_violet, _violetDark]),
+                  gradient: const LinearGradient(
+                      colors: [_violet, _violetDark]),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -1142,7 +2003,8 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: _violet.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(8),
@@ -1159,12 +2021,12 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
             ],
           ),
           const SizedBox(height: 16),
-          ...List.generate(_stocks.length, (index) {
-            final stock = _stocks[index];
-            final isUp = stock['change'] >= 0;
+          ...List.generate(_shares.length, (index) {
+            final share = _shares[index];
+            final isUp = share.change >= 0;
             final color = isUp ? _green : _red;
 
-            return TweenAnimationBuilder(
+            return TweenAnimationBuilder<double>(
               tween: Tween<double>(begin: 0, end: 1),
               duration: Duration(milliseconds: 300 + (index * 50)),
               builder: (context, value, child) {
@@ -1176,7 +2038,7 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
+                        gradient: const LinearGradient(
                           colors: [_cardBg, _cardBg2],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
@@ -1191,13 +2053,18 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
                             height: 48,
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
-                                colors: [color.withOpacity(0.2), color.withOpacity(0.05)],
+                                colors: [
+                                  color.withOpacity(0.2),
+                                  color.withOpacity(0.05)
+                                ],
                               ),
                               borderRadius: BorderRadius.circular(14),
                             ),
                             child: Center(
                               child: Icon(
-                                isUp ? Icons.trending_up : Icons.trending_down,
+                                isUp
+                                    ? Icons.trending_up
+                                    : Icons.trending_down,
                                 color: color,
                                 size: 24,
                               ),
@@ -1209,7 +2076,7 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  stock['symbol'],
+                                  share.companySymbol,
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 16,
@@ -1218,7 +2085,7 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  stock['name'],
+                                  share.companyName,
                                   style: const TextStyle(
                                     color: _textMuted,
                                     fontSize: 11,
@@ -1232,7 +2099,7 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(
-                                '₹${stock['price']}',
+                                '₹${share.currentPrice.toStringAsFixed(2)}',
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
@@ -1241,7 +2108,8 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
                               ),
                               const SizedBox(height: 2),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
                                   color: color.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(8),
@@ -1249,13 +2117,15 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
                                 child: Row(
                                   children: [
                                     Icon(
-                                      isUp ? Icons.arrow_upward : Icons.arrow_downward,
+                                      isUp
+                                          ? Icons.arrow_upward
+                                          : Icons.arrow_downward,
                                       color: color,
                                       size: 10,
                                     ),
                                     const SizedBox(width: 2),
                                     Text(
-                                      '${isUp ? '+' : ''}${stock['changePercent'].toStringAsFixed(2)}%',
+                                      '${isUp ? '+' : ''}${share.changePercent.toStringAsFixed(2)}%',
                                       style: TextStyle(
                                         color: color,
                                         fontSize: 10,
@@ -1282,14 +2152,15 @@ class _ShareMarketScreenState extends State<ShareMarketScreen>
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  ENHANCED HELPER WIDGETS
+//  HELPER WIDGETS
 // ═══════════════════════════════════════════════════════════════
 
 class _EnhancedGlassButton extends StatelessWidget {
   final VoidCallback onTap;
   final Widget child;
 
-  const _EnhancedGlassButton({required this.onTap, required this.child});
+  const _EnhancedGlassButton(
+      {required this.onTap, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -1306,7 +2177,8 @@ class _EnhancedGlassButton extends StatelessWidget {
             ],
           ),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withOpacity(0.12)),
+          border:
+          Border.all(color: Colors.white.withOpacity(0.12)),
         ),
         child: Center(child: child),
       ),
@@ -1329,7 +2201,8 @@ class _EnhancedOrbGlow extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRect(
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+        filter:
+        ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
         child: Container(
           width: size,
           height: size,
@@ -1374,10 +2247,13 @@ class _EnhancedParticlePainter extends CustomPainter {
       final p = particles[i];
       final t = (progress * p.speed + p.phase) % 1.0;
       final y = (p.y - t) % 1.0;
-      final x = p.x + math.sin(t * math.pi * 2 + p.phase * 6) * 0.04;
+      final x = p.x +
+          math.sin(t * math.pi * 2 + p.phase * 6) * 0.04;
 
-      final gradientColor = (i % 3 != 0 ? _violetLight : _gold);
-      paint.color = gradientColor.withOpacity(p.opacity * (0.5 + math.sin(progress * math.pi * 2) * 0.3));
+      final gradientColor =
+      (i % 3 != 0 ? _violetLight : _gold);
+      paint.color = gradientColor.withOpacity(p.opacity *
+          (0.5 + math.sin(progress * math.pi * 2) * 0.3));
 
       canvas.drawCircle(
         Offset(x * size.width, y * size.height),
@@ -1388,7 +2264,8 @@ class _EnhancedParticlePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_EnhancedParticlePainter old) => old.progress != progress;
+  bool shouldRepaint(_EnhancedParticlePainter old) =>
+      old.progress != progress;
 }
 
 class _AnimatedReveal extends StatelessWidget {
@@ -1407,7 +2284,9 @@ class _AnimatedReveal extends StatelessWidget {
     return AnimatedBuilder(
       animation: animation,
       builder: (context, child) {
-        final t = ((animation.value - delay) / (1.0 - delay)).clamp(0.0, 1.0);
+        final t =
+        ((animation.value - delay) / (1.0 - delay))
+            .clamp(0.0, 1.0);
         final curve = Curves.easeOutCubic.transform(t);
         return Opacity(
           opacity: curve,

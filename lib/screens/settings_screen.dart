@@ -331,13 +331,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 style: TextStyle(fontWeight: FontWeight.bold),
                               ),
                       ),
-                    ),
-                    
-                    const SizedBox(height: 32),
-                  ],
-                ),
-              ),
-            ),
+                     ),
+
+                     const SizedBox(height: 32),
+                   ],
+                 ),
+               ),
+             ),
     );
   }
 

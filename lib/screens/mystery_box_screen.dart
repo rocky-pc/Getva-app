@@ -6,6 +6,7 @@ import '../models/mystery_box.dart';
 import '../services/api_service.dart';
 import '../services/session_manager.dart';
 import '../widgets/scratch_card_widget.dart';
+import '../widgets/getva_coin_icon.dart';
 
 class MysteryBoxScreen extends StatefulWidget {
   final MysteryBox box;
@@ -486,8 +487,9 @@ class _PurchaseBottomSheet extends StatelessWidget {
                   border: Border.all(
                       color: const Color(0xFFD4A847).withOpacity(0.6), width: 2),
                 ),
-                child: const Icon(Icons.redeem_rounded,
-                    color: Color(0xFFD4A847), size: 30),
+                child: const Center(
+                  child: GetvaCoinIcon(size: 32),
+                ),
               ),
             ],
           ),
@@ -1039,7 +1041,7 @@ class _ResultDialog extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (isGift) ...[
-                  // Gold glow + star
+                  // Gold glow + coin
                   Stack(
                     alignment: Alignment.center,
                     children: [
@@ -1063,8 +1065,9 @@ class _ResultDialog extends StatelessWidget {
                           border: Border.all(
                               color: Colors.amber.withOpacity(0.5), width: 2),
                         ),
-                        child:
-                        const Icon(Icons.stars, color: Colors.amber, size: 38),
+                        child: const Center(
+                          child: GetvaCoinIcon(size: 44),
+                        ),
                       ),
                     ],
                   ),
@@ -1284,7 +1287,7 @@ class _CardBack extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           if (isGift) ...[
-            Icon(Icons.stars, color: Colors.amber, size: isLarge ? 48 : 24),
+            GetvaCoinIcon(size: isLarge ? 48 : 24),
             SizedBox(height: isLarge ? 12 : 6),
             Text('₹${(reward ?? 0).toStringAsFixed(0)}',
                 style: TextStyle(

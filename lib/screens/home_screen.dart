@@ -7,6 +7,7 @@ import '../models/mystery_box.dart';
 import '../services/api_service.dart';
 import '../services/session_manager.dart';
 import '../widgets/common_bottom_nav.dart';
+import '../widgets/getva_coin_icon.dart';
 import 'mystery_box_screen.dart';
 import 'wallet_screen.dart';
 import 'profile_screen.dart';
@@ -352,8 +353,9 @@ class _HomeScreenState extends State<HomeScreen>
                       );
                     },
                     onGetvaCoinTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Getva Coin feature coming soon!')),
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const GetvaCoinScreen()),
                       );
                     },
                   ),
@@ -537,33 +539,7 @@ class _LogoMark extends StatelessWidget {
     return Row(
       children: [
         // Icon mark
-        Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [_gold, _goldBright],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(11),
-            boxShadow: [
-              BoxShadow(
-                color: _gold.withOpacity(0.4),
-                blurRadius: 14,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: const Center(
-            child: Text('G',
-                style: TextStyle(
-                    color: Color(0xFF1A1200),
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -1)),
-          ),
-        ),
+        const GetvaCoinIcon(size: 38, isCircular: false),
         const SizedBox(width: 10),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -918,6 +894,9 @@ class _StyledBannerState extends State<_StyledBanner>
 
   @override
   Widget build(BuildContext context) {
+    // Prevent loading network image with empty URL
+    final bool hasImage = widget.imageUrl.trim().isNotEmpty && (widget.imageUrl.startsWith('http') || widget.imageUrl.startsWith('https'));
+
     return Container(
       height: 160,
       decoration: BoxDecoration(
@@ -936,17 +915,15 @@ class _StyledBannerState extends State<_StyledBanner>
           fit: StackFit.expand,
           children: [
             // Image
-            Image.network(
-              widget.imageUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF1C1726), Color(0xFF2A1F3D)],
-                  ),
-                ),
-              ),
-            ),
+            if (hasImage)
+              Image.network(
+                widget.imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _buildPlaceholder(),
+              )
+            else
+              _buildPlaceholder(),
+            
             // Dark overlay gradient
             Container(
               decoration: BoxDecoration(
@@ -1068,6 +1045,22 @@ class _StyledBannerState extends State<_StyledBanner>
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholder() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF1C1726), Color(0xFF2A1F3D)],
+        ),
+      ),
+      child: Center(
+        child: Opacity(
+          opacity: 0.1,
+          child: Icon(Icons.image_outlined, size: 64, color: _gold),
         ),
       ),
     );
@@ -1712,18 +1705,13 @@ class _InvestmentOptionsSection extends StatelessWidget {
                 child: _InvestmentCard(
                   title: 'Getva Coin',
                   // subtitle: 'Coming Soon',
-                  icon: Icons.currency_bitcoin_rounded,
+                  iconWidget: const GetvaCoinIcon(size: 24),
                   gradient: const LinearGradient(
                     colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const GetvaCoinScreen()),
-                    );
-                  },
+                  onTap: onGetvaCoinTap,
                 ),
               ),
             ],
@@ -1740,7 +1728,8 @@ class _InvestmentOptionsSection extends StatelessWidget {
 class _InvestmentCard extends StatelessWidget {
   final String title;
   // final String subtitle;
-  final IconData icon;
+  final IconData? icon;
+  final Widget? iconWidget;
   final Gradient gradient;
   final VoidCallback onTap;
 
@@ -1748,7 +1737,8 @@ class _InvestmentCard extends StatelessWidget {
     Key? key,
     required this.title,
     // required this.subtitle,
-    required this.icon,
+    this.icon,
+    this.iconWidget,
     required this.gradient,
     required this.onTap,
   }) : super(key: key);
@@ -1784,9 +1774,9 @@ class _InvestmentCard extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                gradient: gradient,
+                gradient: iconWidget != null ? null : gradient,
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: [
+                boxShadow: iconWidget != null ? null : [
                   BoxShadow(
                     color: gradient.colors.first.withOpacity(0.3),
                     blurRadius: 8,
@@ -1794,7 +1784,7 @@ class _InvestmentCard extends StatelessWidget {
                   ),
                 ],
               ),
-              child: Icon(
+              child: iconWidget ?? Icon(
                 icon,
                 color: Colors.white,
                 size: 24,

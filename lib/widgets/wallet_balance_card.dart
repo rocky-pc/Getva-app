@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
+import 'getva_coin_icon.dart';
 
 // ── Design tokens ────────────────────────────────────────────────
 const _gold        = Color(0xFFD4A847);
@@ -244,8 +245,6 @@ class _WalletBalanceCardState extends State<WalletBalanceCard>
     );
   }
 
-  // ... rest of the widget methods remain the same ...
-
   Widget _buildTopRow() {
     return Row(
       children: [
@@ -266,6 +265,8 @@ class _WalletBalanceCardState extends State<WalletBalanceCard>
                   boxShadow: [BoxShadow(color: _green, blurRadius: 4)],
                 ),
               ),
+              const SizedBox(width: 6),
+              const GetvaCoinIcon(size: 14, isCircular: false),
               const SizedBox(width: 6),
               const Text('GETVA Wallet',
                   style: TextStyle(
@@ -394,9 +395,6 @@ class _WalletBalanceCardState extends State<WalletBalanceCard>
     );
   }
 }
-
-// Keeping the rest of the private helper classes (_ActionButton, _StripDivider, etc.)
-// from the original file...
 
 class _ActionButton extends StatefulWidget {
   final IconData icon;

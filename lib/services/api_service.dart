@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:Getva/services/session_manager.dart';
 import 'package:http/http.dart' as http;
 import '../models/gold_rate.dart';
+import '../models/share_market.dart';
 
 class ApiService {
   // For Android emulator: use 10.0.2.2 to connect to host machine's localhost
@@ -678,6 +679,271 @@ class ApiService {
       return jsonDecode(response.body);
     } catch (e) {
       return {'success': false, 'message': 'Failed to submit request: $e'};
+    }
+  }
+
+  // ======================
+  // SHARE MARKET APIs
+  // ======================
+
+  // Get all companies
+  static Future<List<Company>> getCompanies() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/share_market.php?action=get_companies'),
+      );
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) {
+        return (data['data'] as List)
+            .map((json) => Company.fromJson(json))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('getCompanies error: $e');
+      return [];
+    }
+  }
+
+  // Get company by ID
+  static Future<Company?> getCompany(int companyId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/share_market.php?action=get_company&id=$companyId'),
+      );
+      final data = jsonDecode(response.body);
+      if (data['success'] == true && data['data'] != null) {
+        return Company.fromJson(data['data']);
+      }
+      return null;
+    } catch (e) {
+      print('getCompany error: $e');
+      return null;
+    }
+  }
+
+  // Create new company (Admin only)
+  static Future<Map<String, dynamic>> createCompany({
+    required String symbol,
+    required String name,
+    required String sector,
+    required String description,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/share_market.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'action': 'create_company',
+          'symbol': symbol,
+          'name': name,
+          'sector': sector,
+          'description': description,
+        }),
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to create company: $e'};
+    }
+  }
+
+  // Update company (Admin only)
+  static Future<Map<String, dynamic>> updateCompany({
+    required int companyId,
+    required String symbol,
+    required String name,
+    required String sector,
+    required String description,
+    required bool isActive,
+  }) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/share_market.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'action': 'update_company',
+          'id': companyId,
+          'symbol': symbol,
+          'name': name,
+          'sector': sector,
+          'description': description,
+          'is_active': isActive,
+        }),
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to update company: $e'};
+    }
+  }
+
+  // Get all shares
+  static Future<List<Share>> getShares() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/share_market.php?action=get_shares'),
+      );
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) {
+        return (data['data'] as List)
+            .map((json) => Share.fromJson(json))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('getShares error: $e');
+      return [];
+    }
+  }
+
+  // Get share by company symbol
+  static Future<Share?> getShare(String symbol) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/share_market.php?action=get_share&symbol=$symbol'),
+      );
+      final data = jsonDecode(response.body);
+      if (data['success'] == true && data['data'] != null) {
+        return Share.fromJson(data['data']);
+      }
+      return null;
+    } catch (e) {
+      print('getShare error: $e');
+      return null;
+    }
+  }
+
+  // Update share price (Admin only)
+  static Future<Map<String, dynamic>> updateSharePrice({
+    required int shareId,
+    required double newPrice,
+    required int volume,
+  }) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/share_market.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'action': 'update_share_price',
+          'share_id': shareId,
+          'new_price': newPrice,
+          'volume': volume,
+        }),
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to update share price: $e'};
+    }
+  }
+
+  // Buy shares
+  static Future<Map<String, dynamic>> buyShares({
+    required int userId,
+    required int shareId,
+    required String companySymbol,
+    required int quantity,
+    required double pricePerShare,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/share_market.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'action': 'buy_shares',
+          'user_id': userId,
+          'share_id': shareId,
+          'company_symbol': companySymbol,
+          'quantity': quantity,
+          'price_per_share': pricePerShare,
+        }),
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to buy shares: $e'};
+    }
+  }
+
+  // Sell shares
+  static Future<Map<String, dynamic>> sellShares({
+    required int userId,
+    required int shareId,
+    required String companySymbol,
+    required int quantity,
+    required double pricePerShare,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/share_market.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'action': 'sell_shares',
+          'user_id': userId,
+          'share_id': shareId,
+          'company_symbol': companySymbol,
+          'quantity': quantity,
+          'price_per_share': pricePerShare,
+        }),
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to sell shares: $e'};
+    }
+  }
+
+  // Get user share holdings
+  static Future<List<UserShareHolding>> getUserShareHoldings(int userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/share_market.php?action=get_user_holdings&user_id=$userId'),
+      );
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) {
+        return (data['data'] as List)
+            .map((json) => UserShareHolding.fromJson(json))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('getUserShareHoldings error: $e');
+      return [];
+    }
+  }
+
+  // Get user share transactions
+  static Future<List<ShareTransaction>> getUserShareTransactions(int userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/share_market.php?action=get_user_transactions&user_id=$userId'),
+      );
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) {
+        return (data['data'] as List)
+            .map((json) => ShareTransaction.fromJson(json))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('getUserShareTransactions error: $e');
+      return [];
+    }
+  }
+
+  // Get share price history for charting
+  static Future<List<Map<String, dynamic>>> getSharePriceHistory({
+    required String symbol,
+    required String period, // '1D', '1W', '1M', '1Y', 'ALL'
+  }) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/share_market.php?action=get_price_history&symbol=$symbol&period=$period'),
+      );
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) {
+        return List<Map<String, dynamic>>.from(data['data'] ?? []);
+      }
+      return [];
+    } catch (e) {
+      print('getSharePriceHistory error: $e');
+      return [];
     }
   }
 }

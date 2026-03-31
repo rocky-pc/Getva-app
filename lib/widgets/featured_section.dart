@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'getva_coin_icon.dart';
 
 class FeaturedSection extends StatelessWidget {
   const FeaturedSection({Key? key}) : super(key: key);
@@ -20,31 +21,33 @@ class FeaturedSection extends StatelessWidget {
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
                   letterSpacing: -0.5,
+                  color: Colors.white,
                 ),
               ),
               TextButton(
                 onPressed: () {},
-                child: const Text('View All'),
+                child: const Text('View All', style: TextStyle(color: Color(0xFFD4A847))),
               ),
             ],
           ),
           const SizedBox(height: 12),
           Container(
-            height: 200, // Increased from 180 to prevent overflow
+            height: 200, 
             width: double.infinity,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
               gradient: LinearGradient(
                 colors: [
-                  theme.colorScheme.secondary,
-                  theme.colorScheme.primary,
+                  const Color(0xFF16132A),
+                  const Color(0xFF110F1E),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
+              border: Border.all(color: const Color(0xFF1E1B32)),
               boxShadow: [
                 BoxShadow(
-                  color: theme.colorScheme.primary.withOpacity(0.2),
+                  color: Colors.black.withOpacity(0.3),
                   blurRadius: 15,
                   offset: const Offset(0, 8),
                 ),
@@ -55,16 +58,18 @@ class FeaturedSection extends StatelessWidget {
               child: Stack(
                 children: [
                   Positioned(
-                    right: -30,
-                    bottom: -20,
-                    child: Icon(
-                      Icons.stars_rounded,
-                      size: 200,
-                      color: Colors.white.withOpacity(0.15),
+                    right: -40,
+                    bottom: -40,
+                    child: Opacity(
+                      opacity: 0.1,
+                      child: Transform.rotate(
+                        angle: -0.2,
+                        child: const GetvaCoinIcon(size: 220),
+                      ),
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.all(20.0), // Slightly reduced padding
+                    padding: const EdgeInsets.all(20.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -72,13 +77,13 @@ class FeaturedSection extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: const Color(0xFFD4A847).withOpacity(0.2),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: const Text(
                             'BEST VALUE',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: Color(0xFFD4A847),
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 1,
@@ -107,8 +112,8 @@ class FeaturedSection extends StatelessWidget {
                         ElevatedButton(
                           onPressed: () {},
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: theme.colorScheme.primary,
+                            backgroundColor: const Color(0xFFD4A847),
+                            foregroundColor: const Color(0xFF1A1200),
                             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),

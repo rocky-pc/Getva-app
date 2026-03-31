@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
+import 'getva_coin_icon.dart';
 
 // ── Design tokens ────────────────────────────────────────────────
 const _gold        = Color(0xFFD4A847);
@@ -253,11 +254,18 @@ class RecentTransactionsState extends State<RecentTransactions> {
 
     final rawAmount  = double.tryParse(tx['amount']?.toString() ?? '0') ?? 0.0;
     final isPositive = type == 'deposit' || type == 'reward' || type == 'getva_coin_purchase';
+    
+    Widget? iconWidget;
+    if (type == 'getva_coin_purchase') {
+      iconWidget = const GetvaCoinIcon(size: 20);
+    }
+
     return _TransactionTile(
       type: type, isPositive: isPositive, amount: rawAmount.abs(),
       date:  _formatDate(tx['date']?.toString() ?? ''),
       title: title,
       icon:  _txIcon(type), color: _txColor(type), tag: _txTag(type),
+      iconWidget: iconWidget,
     );
   }
 
@@ -341,11 +349,13 @@ class _TransactionTile extends StatefulWidget {
   final String type; final bool isPositive; final double amount;
   final String date; final String title;
   final IconData icon; final Color color; final String tag;
+  final Widget? iconWidget;
 
   const _TransactionTile({Key? key,
     required this.type, required this.isPositive, required this.amount,
     required this.date, required this.title,
     required this.icon, required this.color, required this.tag,
+    this.iconWidget,
   }) : super(key: key);
 
   @override
@@ -397,7 +407,7 @@ class _TransactionTileState extends State<_TransactionTile>
                 borderRadius: BorderRadius.circular(13),
                 border: Border.all(color: widget.color.withOpacity(0.2)),
               ),
-              child: Icon(widget.icon, color: widget.color, size: 20),
+              child: widget.iconWidget ?? Icon(widget.icon, color: widget.color, size: 20),
             ),
             const SizedBox(width: 14),
             Expanded(child: Column(
