@@ -219,7 +219,29 @@ class _GoldScreenState extends State<GoldScreen> with TickerProviderStateMixin {
             _updateHeldGoldForType();
           },
           onPurchaseComplete: () {
-            // Refresh held-gold badge after a buy
+            _loadHeldGold();
+          },
+        ),
+      ),
+    );
+  }
+
+  void _showSellSheet(BuildContext context, List<GoldRate> goldRates) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: _SellGoldSheet(
+          selectedGoldType: _selectedGoldType,
+          goldRates: goldRates,
+          userGoldGrams: _heldGoldGrams,
+          onGoldTypeChanged: (t) {
+            setState(() => _selectedGoldType = t);
+            _updateHeldGoldForType();
+          },
+          onSellComplete: () {
             _loadHeldGold();
           },
         ),
@@ -419,11 +441,28 @@ class _GoldScreenState extends State<GoldScreen> with TickerProviderStateMixin {
                         child: _AnimatedReveal(
                           animation: _entryAnim,
                           delay: 0.4,
-                          child: Padding(
+                            child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 20),
                             child: _BuyButton(
                               pulseAnim: _pulseAnim,
                               onTap: () => _showBuySheet(context, goldRates),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                      SliverToBoxAdapter(
+                        child: _AnimatedReveal(
+                          animation: _entryAnim,
+                          delay: 0.45,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: _SellButton(
+                              pulseAnim: _pulseAnim,
+                              onTap: _heldGoldGrams > 0 
+                                  ? () => _showSellSheet(context, goldRates)
+                                  : null,
+                              hasGold: _heldGoldGrams > 0,
                             ),
                           ),
                         ),
@@ -2497,6 +2536,661 @@ class _GlassButton extends StatelessWidget {
           border: Border.all(color: Colors.white.withOpacity(0.08)),
         ),
         child: Center(child: child),
+      ),
+    );
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────
+// _SellButton
+// ────────────────────────────────────────────────────────────────────
+class _SellButton extends StatefulWidget {
+  final Animation<double> pulseAnim;
+  final VoidCallback? onTap;
+  final bool hasGold;
+
+  const _SellButton({required this.pulseAnim, this.onTap, this.hasGold = false});
+
+  @override
+  State<_SellButton> createState() => _SellButtonState();
+}
+
+class _SellButtonState extends State<_SellButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 110),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isEnabled = widget.hasGold && widget.onTap != null;
+    
+    return GestureDetector(
+      onTapDown: isEnabled ? (_) => _ctrl.forward() : null,
+      onTapUp: isEnabled
+          ? (_) {
+              _ctrl.reverse();
+              HapticFeedback.mediumImpact();
+              widget.onTap!();
+            }
+          : null,
+      onTapCancel: isEnabled ? () => _ctrl.reverse() : null,
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_ctrl, widget.pulseAnim]),
+        builder: (context, child) => Transform.scale(
+          scale: 1.0 - _ctrl.value * 0.02,
+          child: Container(
+            height: 58,
+            decoration: BoxDecoration(
+              gradient: isEnabled
+                  ? const LinearGradient(
+                      colors: [_rose, Color(0xFFFF6B8A), _rose],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
+              color: isEnabled ? null : _cardBg,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: isEnabled ? _rose.withOpacity(0.5) : _border,
+              ),
+              boxShadow: isEnabled
+                  ? [
+                      BoxShadow(
+                        color: _rose.withOpacity(0.3),
+                        blurRadius: 20,
+                        offset: const Offset(0, 6),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: child,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: isEnabled
+                    ? Colors.white.withOpacity(0.15)
+                    : Colors.white.withOpacity(0.05),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.sell_rounded,
+                color: isEnabled ? Colors.white : _textMuted,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              widget.hasGold ? 'Sell Gold' : 'No Gold to Sell',
+              style: TextStyle(
+                color: isEnabled ? Colors.white : _textMuted,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────
+// _SellGoldSheet
+// ────────────────────────────────────────────────────────────────────
+class _SellGoldSheet extends StatefulWidget {
+  final String selectedGoldType;
+  final List<GoldRate> goldRates;
+  final double userGoldGrams;
+  final Function(String) onGoldTypeChanged;
+  final VoidCallback? onSellComplete;
+
+  const _SellGoldSheet({
+    required this.selectedGoldType,
+    required this.goldRates,
+    required this.userGoldGrams,
+    required this.onGoldTypeChanged,
+    this.onSellComplete,
+  });
+
+  @override
+  State<_SellGoldSheet> createState() => _SellGoldSheetState();
+}
+
+class _SellGoldSheetState extends State<_SellGoldSheet> {
+  late String _selectedType;
+  double _grams = 1.0;
+  bool _loading = false;
+  final _gramsController = TextEditingController(text: '1.0');
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedType = widget.selectedGoldType;
+    _grams = widget.userGoldGrams > 0 ? widget.userGoldGrams : 1.0;
+    _gramsController.text = _grams.toString();
+  }
+
+  @override
+  void dispose() {
+    _gramsController.dispose();
+    super.dispose();
+  }
+
+  GoldRate get _rate => widget.goldRates.firstWhere(
+        (r) => r.goldType == _selectedType,
+    orElse: () => widget.goldRates.first,
+  );
+
+  double get _total => _grams * _rate.ratePerGram;
+
+  bool get _canSell => _grams > 0 && _grams <= widget.userGoldGrams;
+
+  void _onGoldTypeSelected(String type) {
+    setState(() {
+      _selectedType = type;
+    });
+    widget.onGoldTypeChanged(type);
+  }
+
+  Future<void> _submitSellRequest() async {
+    if (!_canSell) {
+      _showError('Please enter a valid amount within your gold balance');
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Confirm Sell Request',
+          style: TextStyle(color: _textPrimary, fontWeight: FontWeight.w800),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'You are selling ${_grams.toStringAsFixed(2)}g of $_selectedType gold.',
+              style: const TextStyle(color: _textMuted),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'You will receive: ₹${_total.toStringAsFixed(2)}',
+              style: const TextStyle(
+                color: _rose,
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'This request requires admin approval. Your gold will be deducted and funds will be added to your wallet after approval.',
+              style: TextStyle(color: _textMuted, fontSize: 11),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: _textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _rose,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Submit Request',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _loading = true);
+    try {
+      final userId = await SessionManager.getUserId();
+      if (userId == null) throw Exception('User not logged in');
+
+      final result = await ApiService.submitGoldSellRequest(
+        userId: userId,
+        goldType: _selectedType,
+        grams: _grams,
+        ratePerGram: _rate.ratePerGram,
+        totalAmount: _total,
+      );
+
+      if (result['success'] != true) {
+        throw Exception(result['message'] ?? 'Sell request failed');
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Sell request submitted! Pending admin approval.',
+            ),
+            backgroundColor: _violet,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+        widget.onSellComplete?.call();
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) _showError(e.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: _red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
+      decoration: const BoxDecoration(
+        color: _surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: Colors.white10,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [_rose, Color(0xFFFF6B8A)]),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.sell_rounded,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    'Sell Digital Gold',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    'Instant Credit to Wallet',
+                    style: TextStyle(color: _textMuted, fontSize: 12),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: _cardBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _border),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Available $_selectedType Gold',
+                      style: const TextStyle(
+                        color: _textMuted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${widget.userGoldGrams.toStringAsFixed(3)} g',
+                      style: const TextStyle(
+                        color: _gold,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const Text(
+                      'Current Value',
+                      style: TextStyle(
+                        color: _textMuted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '₹${(widget.userGoldGrams * _rate.ratePerGram).toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        color: _green,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          Row(
+            children: ['24K', '22K', '18K'].map((t) {
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: GestureDetector(
+                    onTap: () => _onGoldTypeSelected(t),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        gradient: _selectedType == t
+                            ? const LinearGradient(colors: [_rose, Color(0xFFFF6B8A)])
+                            : null,
+                        color: _selectedType == t ? null : _cardBg,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: _selectedType == t ? _rose : _border,
+                        ),
+                      ),
+                      child: Text(
+                        t,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: _selectedType == t
+                              ? Colors.white
+                              : Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 20),
+
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: _cardBg,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: _rose.withOpacity(0.2)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Rate / Gram',
+                        style: TextStyle(color: _textMuted, fontSize: 11),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '₹${_rate.ratePerGram.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          color: _gold,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(width: 1, height: 36, color: _border),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text(
+                        'Rate / Tola',
+                        style: TextStyle(color: _textMuted, fontSize: 11),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '₹${_rate.ratePerTola.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          TextField(
+            controller: _gramsController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: const TextStyle(color: Colors.white),
+            onChanged: (v) => setState(() => _grams = double.tryParse(v) ?? 0),
+            decoration: InputDecoration(
+              labelText: 'Quantity to sell (grams)',
+              labelStyle: const TextStyle(color: _textMuted),
+              filled: true,
+              fillColor: _cardBg,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          Row(
+            children: [0.5, 1.0, 5.0, 10.0].map((g) {
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _grams = g > widget.userGoldGrams ? widget.userGoldGrams : g;
+                        _gramsController.text = _grams.toString();
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: _grams == g ? _rose.withOpacity(0.15) : _cardBg,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: _grams == g
+                              ? _rose.withOpacity(0.5)
+                              : _border,
+                        ),
+                      ),
+                      child: Text(
+                        '${g}g',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: _grams == g ? _rose : _textMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 20),
+
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: _rose.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: _rose.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                const Text(
+                  'You Will Receive',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '₹${_total.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    color: _rose,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          GestureDetector(
+            onTap: _loading || !_canSell ? null : _submitSellRequest,
+            child: Opacity(
+              opacity: (_canSell && !_loading) ? 1.0 : 0.5,
+              child: Container(
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: _canSell && !_loading
+                      ? const LinearGradient(
+                          colors: [_rose, Color(0xFFFF6B8A), _rose],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        )
+                      : null,
+                  color: _canSell && !_loading ? null : _textMuted.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: _canSell
+                      ? [
+                          BoxShadow(
+                            color: _rose.withOpacity(0.4),
+                            blurRadius: 20,
+                            offset: const Offset(0, 6),
+                          ),
+                        ]
+                      : [],
+                ),
+                child: Center(
+                  child: _loading
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.sell_rounded,
+                              color: _canSell ? Colors.white : _textMuted,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _canSell
+                                  ? 'SUBMIT SELL REQUEST'
+                                  : 'ENTER VALID AMOUNT',
+                              style: TextStyle(
+                                color: _canSell ? Colors.white : _textMuted,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
       ),
     );
   }

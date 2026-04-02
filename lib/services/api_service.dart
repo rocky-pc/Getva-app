@@ -929,6 +929,130 @@ class ApiService {
     }
   }
 
+  // Submit gold sell request - requires admin approval
+  static Future<Map<String, dynamic>> submitGoldSellRequest({
+    required int userId,
+    required String goldType,
+    required double grams,
+    required double ratePerGram,
+    required double totalAmount,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/gold_rates.php'),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: {
+          'action': 'sell_request',
+          'user_id': userId.toString(),
+          'gold_type': goldType,
+          'grams': grams.toString(),
+          'rate_per_gram': ratePerGram.toString(),
+          'total_amount': totalAmount.toString(),
+        },
+      );
+      
+      if (response.statusCode == 200 && response.body.isNotEmpty) {
+        return jsonDecode(response.body);
+      } else {
+        return {'success': false, 'message': 'Server returned empty response'};
+      }
+    } catch (e) {
+      print('submitGoldSellRequest error: $e');
+      return {'success': false, 'message': 'Failed to submit sell request: $e'};
+    }
+  }
+
+  // Get user's gold sell requests
+  static Future<List<Map<String, dynamic>>> getUserGoldSellRequests(int userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/gold_rates.php?action=sell_requests&user_id=$userId'),
+      );
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) {
+        return List<Map<String, dynamic>>.from(data['data'] ?? []);
+      }
+      return [];
+    } catch (e) {
+      print('getUserGoldSellRequests error: $e');
+      return [];
+    }
+  }
+
+  // Get pending gold sell requests count (for badge)
+  static Future<int> getPendingGoldSellRequestsCount() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/gold_rates.php?action=pending_sell_count'),
+      );
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) {
+        return int.tryParse(data['count']?.toString() ?? '0') ?? 0;
+      }
+      return 0;
+    } catch (e) {
+      print('getPendingGoldSellRequestsCount error: $e');
+      return 0;
+    }
+  }
+
+  // Get all pending sell requests (for admin)
+  static Future<List<Map<String, dynamic>>> getAllPendingGoldSellRequests() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/gold_rates.php?action=all_pending_sell_requests'),
+      );
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) {
+        return List<Map<String, dynamic>>.from(data['data'] ?? []);
+      }
+      return [];
+    } catch (e) {
+      print('getAllPendingGoldSellRequests error: $e');
+      return [];
+    }
+  }
+
+  // Approve gold sell request (admin)
+  static Future<Map<String, dynamic>> approveGoldSellRequest(int requestId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/gold_rates.php'),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: {
+          'action': 'approve_sell_request',
+          'request_id': requestId.toString(),
+        },
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      print('approveGoldSellRequest error: $e');
+      return {'success': false, 'message': 'Failed to approve request: $e'};
+    }
+  }
+
+  // Reject gold sell request (admin)
+  static Future<Map<String, dynamic>> rejectGoldSellRequest(int requestId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/gold_rates.php'),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: {
+          'action': 'reject_sell_request',
+          'request_id': requestId.toString(),
+        },
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      print('rejectGoldSellRequest error: $e');
+      return {'success': false, 'message': 'Failed to reject request: $e'};
+    }
+  }
+
+  // ======================
+  // SHARE MARKET APIs (Continued)
+  // ======================
+
   // Get share price history for charting
   static Future<List<Map<String, dynamic>>> getSharePriceHistory({
     required String symbol,
